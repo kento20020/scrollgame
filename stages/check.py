@@ -3,7 +3,7 @@
 
 usage:
   python3 check.py path/to/image.png [--preview out.png]
-  python3 check.py --all          # (re)writes preview_*.png and stages.json for the built-in stages
+  python3 check.py --all          # every stage image here: (re)writes preview_*.png and the terrain in stages.json
 
 Pipeline (same as the game):
   1. downscale so the long side is 128 art px (BOX filter, aspect kept)
@@ -145,10 +145,19 @@ def make_preview(img_path, final, out_path, scale=3):
     canvas.save(out_path)
 
 
-STAGES = [
-    ("shu_street", "朱の楼閣街", "shu_street.png"),
-    ("bamboo_path", "竹林の小径", "bamboo_path.png"),
-]
+IMG_EXT = {".png", ".jpg", ".jpeg", ".gif", ".webp"}
+
+
+def stage_list():
+    """stages.json entries (order, names, descriptions) plus any unlisted image in this folder — same rule as build.py."""
+    path = os.path.join(HERE, "stages.json")
+    manifest = json.load(open(path, encoding="utf-8")) if os.path.isfile(path) else []
+    listed = {e["file"] for e in manifest}
+    for fn in sorted(os.listdir(HERE)):
+        stem, ext = os.path.splitext(fn)
+        if ext.lower() in IMG_EXT and not fn.startswith("preview_") and fn not in listed:
+            manifest.append({"id": stem, "name": stem, "file": fn})
+    return manifest
 
 TARGETS = {"floor": (50, 65), "water": (12, 25), "warm": (3, 8), "wall": (10, 25)}
 
@@ -165,15 +174,16 @@ def verdict(res, extra):
 
 def main(argv):
     if "--all" in argv:
-        out = []
-        for sid, name, fn in STAGES:
-            p = os.path.join(HERE, fn)
+        out = stage_list()
+        for e in out:
+            p = os.path.join(HERE, e["file"])
             res, extra, final = analyse(p)
-            make_preview(p, final, os.path.join(HERE, f"preview_{sid}.png"))
-            print(sid, res, extra, verdict(res, extra) or "OK")
-            out.append({"id": sid, "name": name, "file": fn, "terrain": res})
+            make_preview(p, final, os.path.join(HERE, f"preview_{e['id']}.png"))
+            print(e["id"], res, extra, verdict(res, extra) or "OK")
+            e["terrain"] = res
         with open(os.path.join(HERE, "stages.json"), "w", encoding="utf-8") as f:
             json.dump(out, f, ensure_ascii=False, indent=2)
+            f.write("\n")
         return
     if len(argv) < 2:
         print(__doc__)

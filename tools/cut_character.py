@@ -8,9 +8,12 @@
   1. 指定範囲を切り出し、外周から背景色を塗りつぶして透明化
   2. いちばん大きい塊だけ残す（キャプション文字などを除去）
   3. 輪郭に残った明るいにじみを削る
-  4. 24色に減色 → assets/aoi_portrait.png（タイトル画面用）
+  4. 24色に減色 → characters/aoi/portrait.png（タイトル画面用）
   5. 2x2の多数決で半分に縮小し、1px の明るい縁取りを付ける
-     → assets/aoi_sprite.png（ゲーム内用）
+     → characters/aoi/sprite.png（ゲーム内用）
+
+※ 画像を characters/ に置くだけでも遊べる（背景の除去はゲームが自動で行う）。
+  このスクリプトは、ドット絵として作り込んだ版を作るためのもの。
 """
 import argparse
 import pathlib
@@ -116,15 +119,15 @@ def main():
     ap.add_argument("src")
     ap.add_argument("--box", nargs=4, type=int, default=[118, 20, 196, 130])
     ap.add_argument("--bg", nargs=3, type=int, default=[245, 237, 214])
-    ap.add_argument("--out", default=str(ROOT / "assets"))
+    ap.add_argument("--out", default=str(ROOT / "characters" / "aoi"))
     args = ap.parse_args()
 
     raw = clean_fringe(cut(args.src, tuple(args.box), args.bg))
     portrait = quantize(Image.fromarray(raw), 24)
     out = pathlib.Path(args.out)
-    portrait.save(out / "aoi_portrait.png")
+    portrait.save(out / "portrait.png")
     sprite = add_outline(half_majority(np.array(portrait)))
-    Image.fromarray(sprite).save(out / "aoi_sprite.png")
+    Image.fromarray(sprite).save(out / "sprite.png")
     print("portrait", portrait.size, "sprite", sprite.shape[1::-1])
 
 

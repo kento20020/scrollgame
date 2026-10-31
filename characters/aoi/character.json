@@ -1,0 +1,13 @@
+{
+  "name": "藍",
+  "desc": "扇を持つ旗袍の少女",
+  "alt": "藍（アイ）。黒髪で竹柄の藍色の旗袍を着て、扇を持つ少女。",
+  "order": 0,
+  "sprite": "sprite.png",
+  "portrait": "portrait.png",
+  "walk": { "file": "walk.png", "frames": 4, "loop": [1, 2, 3, 2], "dt": 0.15 },
+  "attack": { "file": "attack.png", "frames": 2 },
+  "feet": [16, 54],
+  "faces": "left",
+  "pixelated": true
+}

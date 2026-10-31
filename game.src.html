@@ -59,7 +59,7 @@ button{font:inherit;color:inherit}
 
 /* ── Title ── */
 #title{overflow-y:auto;overflow-x:hidden}
-.t-wrap{margin:auto;width:100%;max-width:1040px;display:grid;gap:14px 24px;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"hero portrait" "stages stages" "preview preview"}
+.t-wrap{margin:auto;width:100%;max-width:1040px;display:grid;gap:14px 24px;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"hero portrait" "chars chars" "stages stages" "preview preview"}
 .hero{grid-area:hero;min-width:0;align-self:center}
 .logo{font-family:var(--font-title);font-weight:400;color:var(--gold);font-size:clamp(48px,14vw,88px);line-height:1;margin:0;letter-spacing:.06em;white-space:nowrap}
 .tagline{margin:12px 0 0;font-size:14px;line-height:1.7}
@@ -68,7 +68,22 @@ button{font:inherit;color:inherit}
 .howto p{margin:0}
 .portrait{grid-area:portrait;position:relative;width:156px;height:312px;align-self:start}
 .portrait::before{content:"";position:absolute;width:128px;height:128px;left:14px;top:6px;border-radius:50%;border:1px solid var(--gold);opacity:.5;background:var(--ai-2)}
-.portrait img{position:relative;display:block;width:156px;height:312px;image-rendering:pixelated}
+.portrait img{position:relative;display:block;width:156px;height:312px;image-rendering:pixelated;object-fit:contain;object-position:50% 100%}
+.portrait img.smooth{image-rendering:auto}
+.t-btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.t-btns .snd-t{margin-top:0}
+.snd-t b{font-family:var(--font-dot);font-weight:400;color:var(--gold)}
+.chars{grid-area:chars;min-width:0}
+.ccards{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px}
+@media (min-width:600px){ .ccards{grid-template-columns:repeat(auto-fill,minmax(190px,1fr))} }
+.ccard{background:var(--ai-2);border:1px solid var(--line);border-radius:4px;padding:6px 10px 6px 6px;text-align:left;cursor:pointer;min-width:0;min-height:68px;display:grid;grid-template-columns:44px minmax(0,1fr);grid-template-rows:1fr 1fr;column-gap:10px;row-gap:2px}
+.ccard:hover{border-color:var(--muted)}
+.ccard[aria-pressed="true"]{border-color:var(--gold);box-shadow:inset 0 0 0 1px var(--gold)}
+.ccard canvas,.ccard .ph{grid-row:1/3;grid-column:1;display:block;width:44px;height:56px;background:var(--ink);image-rendering:pixelated}
+.ccard canvas[hidden],.ccard .ph[hidden]{display:none}
+.ccard .ph{display:grid;place-items:center;border:1px dashed var(--line);font-family:var(--font-dot);color:var(--muted);font-size:20px;line-height:1}
+.ccard .nm{align-self:end;font-weight:700;font-size:13px;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ccard .ds{align-self:start;font-size:11px;color:var(--muted);line-height:1.35;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .sec-h{font-size:12px;letter-spacing:.14em;color:var(--muted);margin:0 0 6px;font-weight:700}
 .stages{grid-area:stages;min-width:0}
 .cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
@@ -103,9 +118,9 @@ button{font:inherit;color:inherit}
 .best{font-size:12px;margin:8px 0 10px;color:var(--muted);line-height:1.5}
 .best b{color:var(--paper);font-family:var(--font-dot);font-weight:400}
 .pv-msg{font-size:12px;color:var(--peony);margin:6px 0 0}
-#file{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+#file,#cfile{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
 @media (min-width:820px) and (min-height:560px){
-  .t-wrap{grid-template-columns:auto minmax(0,1fr);grid-template-areas:"portrait hero" "portrait stages" "portrait preview"}
+  .t-wrap{grid-template-columns:auto minmax(0,1fr);grid-template-areas:"portrait hero" "portrait chars" "portrait stages" "portrait preview"}
   .portrait,.portrait img{width:208px;height:416px}
   .portrait::before{width:176px;height:176px;left:16px;top:4px}
   .portrait{align-self:center}
@@ -168,6 +183,38 @@ button{font:inherit;color:inherit}
 .ucard .ue{font-size:13px;color:var(--paper);opacity:.85;line-height:1.5}
 .ucard .ul{font-family:var(--font-dot);font-size:12px;color:var(--muted)}
 @media (min-width:760px){ .ucards{grid-template-columns:repeat(3,minmax(0,1fr))} .ucard{grid-template-columns:1fr} .ucard .key{grid-row:auto} }
+/* 工房 (workshop) — a full-window overlay on the title screen */
+.overlay.modal{position:fixed;z-index:20}
+.ov-sub b{font-family:var(--font-dot);font-weight:400;color:var(--gold)}
+.shop{display:grid;grid-template-columns:1fr;gap:10px;text-align:left;margin-bottom:16px}
+@media (min-width:760px){ .shop{grid-template-columns:repeat(3,minmax(0,1fr))} }
+.sitem{background:var(--ai-2);border:1px solid var(--line);border-radius:4px;padding:12px 14px;display:grid;gap:6px;align-content:start;min-width:0}
+.sitem .s-h{display:flex;align-items:center;gap:10px;min-width:0}
+.sitem .s-tool{font-family:var(--font-title);font-size:22px;line-height:1;color:var(--gold);width:34px;height:34px;display:grid;place-items:center;border:1px solid var(--line);border-radius:2px;flex:none}
+.sitem .s-name{font-weight:700;font-size:15px;line-height:1.35;flex:1;min-width:0}
+.sitem .s-smith{font-size:11px;color:var(--muted);white-space:nowrap}
+.sitem .s-desc{margin:0;font-size:13px;line-height:1.5;opacity:.85}
+.pips{display:flex;gap:3px}
+.pip{width:12px;height:6px;border:1px solid var(--muted)}
+.pip.on{background:var(--gold);border-color:var(--gold)}
+.sitem .s-row{display:flex;align-items:center;gap:10px;min-width:0}
+.sitem .s-eff{font-family:var(--font-dot);font-size:13px;color:var(--paper)}
+.sitem .s-lv{font-family:var(--font-dot);font-size:12px;color:var(--muted);flex:1;white-space:nowrap}
+.sitem .s-buy{padding:6px 12px;min-height:36px;font-size:13px;white-space:nowrap}
+
+/* debug panel (#debug only) */
+.dbg{position:fixed;right:max(8px,env(safe-area-inset-right,0px));bottom:max(8px,env(safe-area-inset-bottom,0px));z-index:30;font-family:var(--font-dot);font-size:12px;line-height:1.4;display:flex;flex-direction:column;align-items:flex-end;gap:6px;max-width:calc(100vw - 16px)}
+.dbg-tg{border:1px solid var(--shu);background:var(--ink);color:var(--shu);border-radius:4px;padding:6px 10px;min-height:32px;font:inherit;cursor:pointer}
+.dbg-p{width:320px;max-width:100%;max-height:min(72vh,600px);overflow:auto;background:rgba(11,15,28,.95);border:1px solid var(--shu);border-radius:4px;padding:10px 12px;display:grid;gap:7px}
+.dbg-p[hidden]{display:none}
+.dbg-p h3{margin:4px 0 0;font-size:12px;font-weight:400;color:var(--shu);letter-spacing:.1em}
+.dbg-p label{display:grid;grid-template-columns:minmax(0,1fr) 62px 44px;gap:6px;align-items:center}
+.dbg-p label.ck{grid-template-columns:auto minmax(0,1fr)}
+.dbg-p input[type=number]{width:62px;background:var(--ai-2);color:var(--paper);border:1px solid var(--line);border-radius:3px;padding:3px 5px;font:inherit}
+.dbg-p .row{display:flex;flex-wrap:wrap;gap:6px}
+.dbg-p button{border:1px solid var(--line);background:var(--ai-2);color:var(--paper);border-radius:3px;padding:5px 8px;font:inherit;cursor:pointer}
+.dbg-p button:hover{border-color:var(--muted)}
+.dbg-p .out{margin:0;color:var(--muted);white-space:pre-wrap}
 .banner{position:absolute;left:0;right:0;top:40%;text-align:center;font-family:var(--font-title);font-size:clamp(30px,9vw,54px);color:var(--paper);pointer-events:none;opacity:0;letter-spacing:.12em;text-shadow:0 0 14px var(--ink),0 2px 0 var(--ink);z-index:4}
 .banner.show{animation:bannerIn 2.8s ease-out forwards}
 @keyframes bannerIn{0%{opacity:0;transform:scale(1.18)}12%{opacity:1;transform:scale(1)}75%{opacity:1}100%{opacity:0}}
@@ -190,6 +237,9 @@ button{font:inherit;color:inherit}
 .stats dd small{font-size:12px;color:var(--muted)}
 .newbest{margin:0;font-weight:700;color:var(--gold);font-size:14px}
 .newbest[hidden]{display:none}
+.earn{margin:0;font-size:14px}
+.earn:empty{display:none}
+.earn b{font-family:var(--font-dot);font-weight:400;color:var(--gold)}
 @media (min-width:640px){ .stats{grid-template-columns:repeat(4,minmax(0,1fr))} }
 @media (prefers-reduced-motion: reduce){
   .banner.show{animation:bannerFade 2.8s linear forwards}
@@ -209,10 +259,19 @@ button{font:inherit;color:inherit}
           <h2>遊び方</h2>
           <p>移動＝WASD／矢印キー。スマホは画面をドラッグ。攻撃は自動。</p>
           <p>墨を祓うと、その場所に色が還る。色の戻った場所では墨が湧かない。</p>
+          <p>立ち止まっていると、やがて足元に色がにじむ。</p>
         </div>
-        <button type="button" class="snd snd-t" id="muteTitle" data-muted="false"><svg viewBox="0 0 18 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 5.5h3l4-3.5v12l-4-3.5H2z" fill="currentColor" stroke="none"/><path class="w" d="M12 5.2q1.6 2.8 0 5.6M14.4 3.2q3 4.8 0 9.6"/><path class="x" d="M12 5.5l4.5 5M16.5 5.5l-4.5 5"/></svg><span class="snd-l">音 あり</span></button>
+        <div class="t-btns">
+          <button type="button" class="snd snd-t" id="muteTitle" data-muted="false"><svg viewBox="0 0 18 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 5.5h3l4-3.5v12l-4-3.5H2z" fill="currentColor" stroke="none"/><path class="w" d="M12 5.2q1.6 2.8 0 5.6M14.4 3.2q3 4.8 0 9.6"/><path class="x" d="M12 5.5l4.5 5M16.5 5.5l-4.5 5"/></svg><span class="snd-l">音 あり</span></button>
+          <button type="button" class="snd-t" id="shopBtn">工房　<b id="shopWallet">0</b> <span id="shopCur">香料</span></button>
+        </div>
       </div>
-      <div class="portrait"><img id="portraitImg" alt="藍（アイ）。黒髪で竹柄の藍色の旗袍を着て、扇を持つ少女。" width="52" height="104"></div>
+      <div class="portrait"><img id="portraitImg" alt=""></div>
+      <div class="chars">
+        <h2 class="sec-h">キャラクター</h2>
+        <div class="ccards" id="ccards"><!-- generated from CHARACTER_DEFS + upload card --></div>
+        <input type="file" id="cfile" accept="image/*" tabindex="-1" aria-hidden="true">
+      </div>
       <div class="stages">
         <h2 class="sec-h">ステージ</h2>
         <div class="cards" id="cards"><!-- generated from STAGES + upload card --></div>
@@ -292,9 +351,20 @@ button{font:inherit;color:inherit}
         <div><dt>記録</dt><dd id="rRec">0%</dd></div>
       </dl>
       <p class="newbest" id="rBest" hidden>自己ベスト更新</p>
+      <p class="earn" id="rEarn"></p>
       <div class="actions"><button class="btn primary" id="againBtn">もう一度</button><button class="btn" id="backBtn">ステージを選ぶ</button></div>
     </div>
   </section>
+
+  <!-- ═════════ 工房 (workshop) ═════════ -->
+  <div class="overlay modal" id="shopOv" role="dialog" aria-modal="true" aria-labelledby="shopTitle">
+    <div class="ov-panel">
+      <h2 class="ov-title" id="shopTitle">工房</h2>
+      <p class="ov-sub" id="shopSub"></p>
+      <div class="shop" id="shopList"></div>
+      <div class="actions"><button class="btn primary" id="shopClose">閉じる</button></div>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -307,25 +377,21 @@ button{font:inherit;color:inherit}
 /* ════════════════════════════════════════════════════════════
    0. Assets, tokens, utilities
    ════════════════════════════════════════════════════════════ */
-const SPRITE_URI = "{{AOI_SPRITE}}";
-const PORTRAIT_URI = "{{AOI_PORTRAIT}}";
-const WARDROBE_URI = "{{WARDROBE}}";
-const AOI_WALK_URI = "{{AOI_WALK}}";     // 4 frames 28×54: 0 idle, 1–3 walk
-const AOI_ATTACK_URI = "{{AOI_ATTACK}}"; // 2 frames 28×54: 0 fan raised, 1 fan swept
-const SHU_STREET_URI = "{{SHU_STREET}}";
-const BAMBOO_PATH_URI = "{{BAMBOO_PATH}}";
+// Stages and characters are filled in by build.py from the stages/ and characters/ folders, so an image
+// dropped there is all a new stage or heroine needs. Stage: { id, name, desc, src }; character: see section 3b.
+const STAGE_DEFS = /*{{STAGE_DEFS}}*/[];
+const CHARACTER_DEFS = /*{{CHARACTER_DEFS}}*/[];
 
 // Stage list — data-driven (title cards are generated from it).
 // kind 'procedural' → src is a function returning a canvas; kind 'image' → src is a URL / data URI.
 const STAGES = [
   { id: 'moon', name: '月夜の水庭', desc: '池と朱の橋の庭', kind: 'procedural', src: () => drawMoonGarden() },
-  { id: 'shu_street', name: '朱の楼閣街', desc: '運河と灯籠の夜の街', kind: 'image', src: SHU_STREET_URI },
-  { id: 'bamboo_path', name: '竹林の小径', desc: '小川と紅葉の竹林', kind: 'image', src: BAMBOO_PATH_URI },
-  { id: 'wardrobe', name: '衣装棚', desc: '見本の画像から', kind: 'image', src: WARDROBE_URI },
+  ...STAGE_DEFS.map((d) => ({ id: d.id, name: d.name, desc: d.desc, kind: 'image', src: d.src })),
 ];
 
 // Sound hooks — window.SFX comes from the inlined sfx.js; a no-op if it is missing.
-const sfx = (n) => { try { window.SFX && window.SFX.play(n); } catch (e) { /* ignore */ } };
+const sfx = (n, o) => { try { window.SFX && window.SFX.play(n, o); } catch (e) { /* ignore */ } };
+const DEBUG = location.hash === '#debug';
 
 const $ = (id) => document.getElementById(id);
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
@@ -717,15 +783,6 @@ function drawMoonGarden() {
    3. Pre-rendered pixel sprites (heroine, ink blobs, blades, hearts)
    ════════════════════════════════════════════════════════════ */
 const SPR = {};
-function prepSprites(img, walk, attack) {
-  const w = img.naturalWidth, h = img.naturalHeight;
-  const base = makeCanvas(w, h); base.getContext('2d').drawImage(img, 0, 0);
-  const flip = makeCanvas(w, h); const fg = flip.getContext('2d'); fg.translate(w, 0); fg.scale(-1, 1); fg.drawImage(img, 0, 0);
-  const white = (src) => { const sw = src.width || src.naturalWidth, sh = src.height || src.naturalHeight, c = makeCanvas(sw, sh), g = c.getContext('2d'); g.drawImage(src, 0, 0); g.globalCompositeOperation = 'source-in'; g.fillStyle = '#fffaf0'; g.fillRect(0, 0, sw, sh); return c; };
-  SPR.aoi = { L: base, R: flip, wL: white(base), wR: white(flip), w, h };
-  if (walk) { SPR.aoi.walk = walk; SPR.aoi.walkW = white(walk); }
-  if (attack) { SPR.aoi.attack = attack; SPR.aoi.attackW = white(attack); }
-}
 
 function rasterBlob(r, frames, pal, opts = {}) {
   const size = Math.ceil(r * 2.6) + 6, hc = size / 2, out = [];
@@ -807,6 +864,154 @@ function prepSmall() {
 }
 
 /* ════════════════════════════════════════════════════════════
+   3b. Characters — any image becomes the heroine
+   def (from characters/ via build.py, or an uploaded image):
+   { id, name, desc?, alt?, sprite, portrait?, walk?: { src, frames, loop?, dt? },
+     attack?: { src, frames }, feet?: [x, y], height?, pixelated?, faces?: 'left'|'right' }
+   With walk/attack sheets the frames play as drawn (feet = anchor in frame px). A single still
+   is cut out of its background when it has none, cropped, and animated procedurally.
+   Pixel art is drawn with square pixels; anything finer is pre-shrunk to the exact on-screen
+   size, so a high-resolution heroine keeps her detail.
+   ════════════════════════════════════════════════════════════ */
+const CHAR_H = 54;        // standard height, head to feet, in world px (hitbox and fan scale with it)
+const CHAR_MAX_PX = 640;  // tallest source kept from a still
+
+function whiteOf(src) {
+  const c = makeCanvas(src.width, src.height), g = c.getContext('2d');
+  g.drawImage(src, 0, 0); g.globalCompositeOperation = 'source-in'; g.fillStyle = '#fffaf0'; g.fillRect(0, 0, c.width, c.height);
+  return c;
+}
+// smooth resize by repeated halving (a single big drawImage step aliases)
+function shrink(src, sx, sy, sw, sh, w, h) {
+  let cur = src, cx = sx, cy = sy, cw = sw, ch = sh;
+  while (cw > w * 2 && ch > h * 2) {
+    const nw = Math.max(w, Math.round(cw / 2)), nh = Math.max(h, Math.round(ch / 2)), c = makeCanvas(nw, nh), g = c.getContext('2d');
+    g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high'; g.drawImage(cur, cx, cy, cw, ch, 0, 0, nw, nh);
+    cur = c; cx = 0; cy = 0; cw = nw; ch = nh;
+  }
+  const out = makeCanvas(w, h), g = out.getContext('2d');
+  g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high'; g.drawImage(cur, cx, cy, cw, ch, 0, 0, w, h);
+  return out;
+}
+function sliceSheet(img, n) {
+  const fw = Math.max(1, Math.floor((img.naturalWidth || img.width) / n)), fh = img.naturalHeight || img.height, out = [];
+  for (let i = 0; i < n; i++) { const c = makeCanvas(fw, fh); c.getContext('2d').drawImage(img, i * fw, 0, fw, fh, 0, 0, fw, fh); out.push(c); }
+  return out;
+}
+// drop every 8-connected blob smaller than `frac` × the largest one (captions, specks, stray background)
+function keepBigBlobs(d, W, H, frac) {
+  const N = W * H, lab = new Int32Array(N), q = new Int32Array(N), sizes = [0];
+  for (let s = 0; s < N; s++) {
+    if (lab[s] || d[s * 4 + 3] <= 24) continue;
+    const id = sizes.length; let h = 0, t = 0; q[t++] = s; lab[s] = id;
+    while (h < t) {
+      const p = q[h++], x = p % W;
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+        if ((!dx && !dy) || x + dx < 0 || x + dx >= W) continue;
+        const m = p + dy * W + dx; if (m < 0 || m >= N || lab[m] || d[m * 4 + 3] <= 24) continue;
+        lab[m] = id; q[t++] = m;
+      }
+    }
+    sizes.push(t);
+  }
+  const big = Math.max(0, ...sizes.slice(1));
+  for (let p = 0; p < N; p++) if (lab[p] && sizes[lab[p]] < big * frac) d[p * 4 + 3] = 0;
+}
+// still → transparent, tightly cropped figure with its feet at the bottom
+function cutout(img) {
+  const sw = img.naturalWidth || img.width, sh = img.naturalHeight || img.height;
+  const f = Math.min(1, 1024 / Math.max(sw, sh)), W = Math.max(1, Math.round(sw * f)), H = Math.max(1, Math.round(sh * f));
+  const work = f < 1 ? shrink(img, 0, 0, sw, sh, W, H) : makeCanvas(W, H);
+  const g = work.getContext('2d', { willReadFrequently: true });
+  if (f >= 1) g.drawImage(img, 0, 0);
+  const id = g.getImageData(0, 0, W, H), d = id.data, N = W * H, orig = new Uint8ClampedArray(d);
+  const border = [];
+  for (let x = 0; x < W; x++) border.push(x, (H - 1) * W + x);
+  for (let y = 1; y < H - 1; y++) border.push(y * W, y * W + W - 1);
+  let clear = 0; for (const p of border) if (d[p * 4 + 3] < 128) clear++;
+  if (clear < border.length * 0.5) {
+    // opaque background: flood-fill the border colour (per-channel median) away, fading the fringe
+    const med = (o) => { const v = border.map((p) => d[p * 4 + o]).sort((a, b) => a - b); return v[v.length >> 1]; };
+    const bg = [med(0), med(1), med(2)], T = 44;
+    const dist = (p) => Math.hypot(d[p * 4] - bg[0], d[p * 4 + 1] - bg[1], d[p * 4 + 2] - bg[2]);
+    const seen = new Uint8Array(N), q = new Int32Array(N); let h = 0, t = 0;
+    for (const p of border) if (!seen[p] && dist(p) < T) { seen[p] = 1; q[t++] = p; }
+    while (h < t) {
+      const p = q[h++], x = p % W;
+      d[p * 4 + 3] = 0;
+      for (const m of [x > 0 ? p - 1 : -1, x < W - 1 ? p + 1 : -1, p - W, p + W]) if (m >= 0 && m < N && !seen[m] && dist(m) < T) { seen[m] = 1; q[t++] = m; }
+    }
+    for (let p = 0; p < N; p++) {
+      if (seen[p]) continue;
+      const x = p % W;
+      if (!((x > 0 && seen[p - 1]) || (x < W - 1 && seen[p + 1]) || (p >= W && seen[p - W]) || (p + W < N && seen[p + W]))) continue;
+      const k = dist(p) / (T * 2); if (k < 1) d[p * 4 + 3] = Math.round(d[p * 4 + 3] * k);
+    }
+    keepBigBlobs(d, W, H, 0.08);
+  }
+  let x0 = W, y0 = H, x1 = -1, y1 = -1;
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (d[(y * W + x) * 4 + 3] > 24) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+  if (x1 < 0) { d.set(orig); x0 = 0; y0 = 0; x1 = W - 1; y1 = H - 1; } // nothing survived: keep the picture as it is
+  g.putImageData(id, 0, 0);
+  const cw = x1 - x0 + 1, ch = y1 - y0 + 1, s = Math.min(1, CHAR_MAX_PX / Math.max(cw, ch));
+  let out;
+  if (s < 1) out = shrink(work, x0, y0, cw, ch, Math.max(1, Math.round(cw * s)), Math.max(1, Math.round(ch * s)));
+  else { out = makeCanvas(cw, ch); out.getContext('2d').drawImage(work, x0, y0, cw, ch, 0, 0, cw, ch); }
+  // feet: alpha-weighted centre of the bottom rows
+  const od = out.getContext('2d', { willReadFrequently: true }).getImageData(0, 0, out.width, out.height).data;
+  let sx = 0, sa = 0;
+  for (let y = Math.max(0, out.height - Math.max(2, Math.round(out.height * 0.06))); y < out.height; y++) {
+    for (let x = 0; x < out.width; x++) { const a = od[(y * out.width + x) * 4 + 3]; sx += x * a; sa += a; }
+  }
+  return { canvas: out, ax: sa ? sx / sa + 0.5 : out.width / 2, ay: out.height };
+}
+
+function makeCharacter(def, imgs) {
+  const CH = { id: def.id, name: def.name || def.id, desc: def.desc || '', alt: def.alt || def.name || def.id, faces: def.faces === 'right' ? 'right' : 'left' };
+  let walk, attack = null, ax, ay;
+  if (def.walk && imgs.walk) {
+    walk = sliceSheet(imgs.walk, Math.max(1, def.walk.frames | 0));
+    if (def.attack && imgs.attack) attack = sliceSheet(imgs.attack, Math.max(1, def.attack.frames | 0));
+    [ax, ay] = Array.isArray(def.feet) ? def.feet.map(Number) : [walk[0].width / 2, walk[0].height];
+  } else {
+    const cut = cutout(imgs.sprite);
+    walk = [cut.canvas]; ax = cut.ax; ay = cut.ay;
+  }
+  const H = clamp(Number(def.height) || CHAR_H, 36, 80);
+  CH.pixel = def.pixelated != null ? !!def.pixelated : ay <= CHAR_H * 1.7;
+  // world px per source px: pixel art keeps whole-number steps so every source pixel stays square
+  CH.s = CH.pixel && ay <= H * 1.5 ? Math.max(1, Math.round(H / ay)) : H / ay;
+  CH.H = ay * CH.s;
+  CH.walk = walk; CH.attack = attack; CH.ax = ax; CH.ay = ay;
+  CH.walkW = walk.map(whiteOf); CH.attackW = attack && attack.map(whiteOf);
+  const loop = def.walk && Array.isArray(def.walk.loop) ? def.walk.loop.filter((i) => i >= 0 && i < walk.length) : [];
+  CH.loop = loop.length ? loop : walk.length > 2 ? walk.map((_, i) => i).slice(1) : walk.map((_, i) => i); // frame 0 = standing
+  CH.dt = (def.walk && Number(def.walk.dt)) || 0.15;
+  CH.procedural = walk.length < 2;
+  CH.portrait = def.portrait || walk[0].toDataURL();
+  CH.cache = null;
+  return CH;
+}
+function loadCharacter(def) {
+  const opt = (u) => (u ? loadImg(u).catch(() => null) : Promise.resolve(null));
+  return Promise.all([opt(def.sprite), opt(def.walk && def.walk.src), opt(def.attack && def.attack.src)]).then(([sprite, walk, attack]) => {
+    if (!sprite && !walk) throw new Error('character image');
+    return makeCharacter(def, { sprite: sprite || walk, walk, attack });
+  });
+}
+// high-resolution heroines: frames pre-shrunk to the on-screen size, rebuilt when the zoom changes
+function heroScaled(CH, k) {
+  if (CH.cache && CH.cache.k === k) return CH.cache;
+  const sc = CH.s * k;
+  const fit = (list) => list && list.map((f) => shrink(f, 0, 0, f.width, f.height, Math.max(1, Math.round(f.width * sc)), Math.max(1, Math.round(f.height * sc))));
+  const walk = fit(CH.walk), attack = fit(CH.attack);
+  CH.cache = { k, sc, walk, attack, walkW: walk.map(whiteOf), attackW: attack && attack.map(whiteOf) };
+  return CH.cache;
+}
+// body anchors above the feet, scaled from the original 54px heroine
+const heroGeo = (H) => ({ top: (H * 40) / 54, bot: (H * 10) / 54, fan: (H * 26) / 54, mid: (H * 22) / 54, head: (H * 58) / 54 });
+
+/* ════════════════════════════════════════════════════════════
    4. Run state
    ════════════════════════════════════════════════════════════ */
 const THRESHOLDS = [15, 30, 45, 60, 75];
@@ -820,6 +1025,37 @@ const ENEMY = {
 // topUp: if a kill lands mostly on already-restored ground, the ripple keeps
 // going to the nearest gray cells until (topUp × disc size) new cells are restored.
 const TUNE = { discBias: 1, topUp: 0.24, rrScale: 0.62 };
+// Foot painting: stand still for `delay` s and the gauge starts; `charge` s later the ground under her
+// feet takes colour (a disc of `radius` cells). Standing on repeats it, `grow` cells wider each time up to
+// `maxRadius`. Moving, knockback or a hit resets it. All of it can be tuned from the #debug panel.
+const FOOT = { delay: 1.0, charge: 3.0, radius: 1, grow: 1, maxRadius: 2 };
+const FOOT_DEFAULT = { ...FOOT };
+
+// 工房 — permanent, deliberately small boosts bought with 香料 earned at the end of every run.
+// val(lv) is what the run uses (see newRun); stat + fmt(lv) is what the card shows.
+const CURRENCY = '香料';
+const SHOP = [
+  { id: 'fan',   tool: '扇', smith: '扇師',   name: '扇の手入れ',   desc: '風を放つ間隔が少し短くなる',                     max: 5, cost: 30, val: (l) => 0.97 ** l,     stat: '風の間隔', fmt: (l) => `−${3 * l}%` },
+  { id: 'zori',  tool: '履', smith: '履物師', name: '草履の鼻緒',   desc: '歩く速さが少し上がる',                           max: 5, cost: 30, val: (l) => 1 + 0.02 * l,  stat: '歩く速さ', fmt: (l) => `+${2 * l}%` },
+  { id: 'brush', tool: '筆', smith: '筆師',   name: '筆おろし',     desc: '立ち止まってから足元が濡れるまでが少し早くなる', max: 5, cost: 30, val: (l) => 1 - 0.04 * l,  stat: '溜め時間', fmt: (l) => `−${4 * l}%` },
+  { id: 'ink',   tool: '硯', smith: '硯師',   name: '硯の墨',       desc: '色づいた場所で墨を祓っても、近くの灰色に色が届きやすい', max: 5, cost: 40, val: (l) => 0.02 * l,      stat: '追い塗り', fmt: (l) => `+${2 * l}%` },
+  { id: 'charm', tool: '守', smith: '宮司',   name: '灯のお守り',   desc: '最大体力が1増える',                              max: 2, cost: 90, val: (l) => l,             stat: '最大体力', fmt: (l) => `+${l}` },
+  { id: 'cloth', tool: '包', smith: '行商人', name: '丈夫な風呂敷', desc: '倒れたときに持ち帰れる香料が増える',             max: 3, cost: 30, val: (l) => 0.5 + 0.1 * l, stat: '持ち帰り', fmt: (l) => `${50 + 10 * l}%` },
+];
+const shopCost = (it, lv) => Math.round(it.cost * 1.5 ** lv);
+const META_KEY = 'irogaeshi:meta';
+const META = { koryo: 0, lv: {} };
+function loadMeta() {
+  const m = store.get(META_KEY) || {};
+  META.koryo = m.koryo > 0 ? Math.floor(m.koryo) : 0;
+  for (const it of SHOP) META.lv[it.id] = clamp((m.lv && m.lv[it.id]) | 0, 0, it.max);
+}
+const saveMeta = () => store.set(META_KEY, META);
+function runBonus() {
+  const b = {};
+  for (const it of SHOP) b[it.id] = it.val(G.noMeta ? 0 : META.lv[it.id] | 0);
+  return b;
+}
 const UPGRADES = [
   { id: 'blades', name: '扇の骨を増やす', desc: '一度に放つ風の刃が1枚増える' },
   { id: 'rate',   name: '風の速さ',       desc: '風を放つ間隔が2割短くなる' },
@@ -832,7 +1068,7 @@ const UPGRADES = [
 const PLAYER_R = 4;          // collision radius at the feet (fits a 1-cell corridor)
 const BASE_SPEED = 62;
 
-const G = { screen: 'title', state: 'title', stage: null, stages: {}, selected: 'moon', bot: false, god: false };
+const G = { screen: 'title', state: 'title', stage: null, stages: {}, selected: 'moon', chars: {}, char: null, bot: false, botStand: false, god: false, noMeta: false };
 let run = null;
 let eid = 1;
 
@@ -844,9 +1080,10 @@ function newRun(st) {
   const gCanvas = makeCanvas(st.CW, st.CH), gctx = gCanvas.getContext('2d');
   const unrest = new Int32Array(st.playableCount), pos = new Int32Array(st.N).fill(-1);
   let n = 0; for (let c = 0; c < st.N; c++) if (st.playable[c]) { unrest[n] = c; pos[c] = n; n++; }
+  const ch = G.chars[G.char], bonus = runBonus(), hp = 5 + bonus.charm;
   run = {
-    stage: st, t: 0, time: 0, kills: 0,
-    p: { x: sx, y: sy + 3, hp: 5, hpMax: 5, inv: 0, fireAt: -9, facing: -1, moving: false, kbx: 0, kby: 0, kbT: 0, healT: 0, inWater: false },
+    stage: st, t: 0, time: 0, kills: 0, ch, geo: heroGeo(ch.H), bonus, footCells: 0,
+    p: { x: sx, y: sy + 3, hp, hpMax: hp, inv: 0, fireAt: -9, facing: -1, moving: false, kbx: 0, kby: 0, kbT: 0, healT: 0, inWater: false, still: 0, paintT: 0, paintN: 0, footR: 0 },
     up: { blades: 0, rate: 0, dmg: 0, speed: 0, echo: 0, heart: 0, pierce: 0 },
     enemies: [], blades: [], parts: [], rings: [], queue: [],
     restored: new Uint8Array(st.N), queued: new Uint8Array(st.N), restoredPlayable: 0,
@@ -899,7 +1136,7 @@ function restoreAt(x, y, rad) {
     queueRestore(c, (Math.sqrt(d2) / Math.max(1, rad)) * 0.25);
   }
   // top-up: ripple on to the nearest still-gray playable cells
-  const want = Math.floor(disc * TUNE.topUp) - fresh;
+  const want = Math.floor(disc * (TUNE.topUp + R.bonus.ink)) - fresh;
   if (want > 0 && R.unrestN > 0) {
     const cand = [];
     for (let k = 0; k < R.unrestN; k++) {
@@ -914,6 +1151,52 @@ function restoreAt(x, y, rad) {
     for (let k = 0; k < n; k++) queueRestore(cand[idx[k] + 1], 0.12 + (Math.sqrt(cand[idx[k]]) / far) * 0.3);
   }
   if (!reduced) R.rings.push({ x, y, r: (rad + 0.5) * CELL, t: 0, dur: 0.3, big: false });
+}
+
+/* ── foot painting ── */
+const footCharge = () => Math.max(0.1, FOOT.charge * run.bonus.brush);
+// calls fn(cell, d²) for the disc of `rad` cells around the cell under her feet (rad 0 = that cell only)
+function footDisc(rad, fn) {
+  const R = run, st = R.stage, cx = Math.floor(R.p.x / CELL), cy = Math.floor(R.p.y / CELL), lim = rad ? rad * rad + TUNE.discBias : 0;
+  for (let dy = -rad; dy <= rad; dy++) for (let dx = -rad; dx <= rad; dx++) {
+    const d2 = dx * dx + dy * dy, nx = cx + dx, ny = cy + dy;
+    if (d2 > lim || nx < 0 || ny < 0 || nx >= st.CW || ny >= st.CH) continue;
+    if (fn(ny * st.CW + nx, d2) === false) return;
+  }
+}
+function footFresh(rad) {
+  const R = run, st = R.stage; let any = false;
+  footDisc(rad, (c) => { if (st.playable[c] && !R.restored[c] && !R.queued[c]) { any = true; return false; } return true; });
+  return any;
+}
+// radius the next painting would use (it grows while she stands on), or -1 when nothing there is gray
+function footTarget() {
+  const P = run.p, lo = Math.max(0, Math.round(FOOT.radius)), hi = Math.max(lo, Math.round(FOOT.maxRadius)), grow = Math.max(0, Math.round(FOOT.grow));
+  const from = Math.min(hi, lo + P.paintN * grow), to = grow ? hi : from;
+  for (let r = from; r <= to; r++) if (footFresh(r)) return r;
+  return -1;
+}
+function paintFeet(rad) {
+  const R = run, st = R.stage, P = R.p;
+  footDisc(rad, (c, d2) => {
+    if (R.restored[c] || R.queued[c]) return;
+    if (st.playable[c]) R.footCells++;
+    queueRestore(c, (Math.sqrt(d2) / Math.max(1, rad)) * 0.3);
+  });
+  if (!reduced) R.rings.push({ x: (Math.floor(P.x / CELL) + 0.5) * CELL, y: (Math.floor(P.y / CELL) + 0.5) * CELL, r: (rad + 0.5) * CELL, t: 0, dur: 0.45, big: false, wet: true });
+  sfx('restore', { vol: 0.7 });
+}
+function resetFoot(P) { P.still = 0; P.paintT = 0; P.paintN = 0; }
+function updateFoot(dt) {
+  const P = run.p;
+  if (P.moving || P.kbT > 0) { resetFoot(P); return; }
+  P.still += dt;
+  if (P.still < FOOT.delay) return;
+  const rad = footTarget();
+  if (rad < 0) { P.paintT = 0; return; } // everything in reach is already coloured
+  P.footR = rad;
+  P.paintT += dt;
+  if (P.paintT >= footCharge()) { P.paintT = 0; paintFeet(rad); P.paintN++; }
 }
 function processQueue() {
   const R = run; if (!R.queue.length) return;
@@ -973,7 +1256,7 @@ function computeCamera() {
   const R = run, st = R.stage, P = R.p;
   const vw = view.devW / view.k, vh = view.devH / view.k;
   const m = view.hudDev / view.k; // keep the world's top edge reachable below the HUD
-  let cx = P.x - vw / 2, cy = P.y - 22 - (vh + m) / 2;
+  let cx = P.x - vw / 2, cy = P.y - R.geo.mid - (vh + m) / 2;
   cx = st.W > vw ? clamp(cx, 0, st.W - vw) : (st.W - vw) / 2;
   cy = st.H > vh - m ? clamp(cy, -m, st.H - vh) : -m - (vh - m - st.H) / 2;
   R.cam.x = cx; R.cam.y = cy; R.cam.w = vw; R.cam.h = vh;
@@ -1026,7 +1309,7 @@ function spawnBoss() {
 }
 
 function fire() {
-  const R = run, P = R.p, ox = P.x, oy = P.y - 26;
+  const R = run, P = R.p, ox = P.x, oy = P.y - R.geo.fan;
   let best = null, bd = Infinity;
   for (const e of R.enemies) { if (e.dead) continue; const d = (e.x - ox) ** 2 + (e.y - oy) ** 2; if (d < bd) { bd = d; best = e; } }
   const ang = best ? Math.atan2(best.y - oy, best.x - ox) : (P.facing > 0 ? 0 : Math.PI);
@@ -1083,17 +1366,18 @@ function hitPlayer(src) {
   const R = run, P = R.p;
   if (G.god) { P.inv = 1; return; }
   P.hp--; P.inv = 1.0;
+  resetFoot(P); // a hit breaks the foot-painting charge
   sfx('hurt');
-  const dx = P.x - src.x, dy = P.y - 20 - src.y, d = Math.hypot(dx, dy) || 1;
+  const dx = P.x - src.x, dy = P.y - R.geo.mid - src.y, d = Math.hypot(dx, dy) || 1;
   P.kbx = (dx / d) * 150; P.kby = (dy / d) * 150; P.kbT = 0.15;
   if (!reduced) R.shake = 0.25;
-  for (let i = 0; i < 6; i++) { const a = Math.random() * Math.PI * 2; R.parts.push({ x: P.x, y: P.y - 24, vx: Math.cos(a) * 60, vy: Math.sin(a) * 60, life: 0.35, max: 0.35, kind: 'hit', s: 2 }); }
+  for (let i = 0; i < 6; i++) { const a = Math.random() * Math.PI * 2; R.parts.push({ x: P.x, y: P.y - R.geo.mid, vx: Math.cos(a) * 60, vy: Math.sin(a) * 60, life: 0.35, max: 0.35, kind: 'hit', s: 2 }); }
   hudCache.hp = -1;
   if (P.hp <= 0) { sfx('death'); endRun('death'); }
 }
 // distance from a point to the heroine's body capsule
 function capsuleDist(px, py, P) {
-  const top = P.y - 40, bot = P.y - 10, cy = clamp(py, top, bot);
+  const top = P.y - run.geo.top, bot = P.y - run.geo.bot, cy = clamp(py, top, bot);
   return Math.hypot(px - P.x, py - cy);
 }
 
@@ -1109,7 +1393,7 @@ function update(dt) {
   if (Math.abs(ix) > 0.1) P.facing = ix > 0 ? 1 : -1;
   const c0 = cellIndex(P.x, P.y);
   P.inWater = st.terrain[c0] === T_WATER;
-  const spd = BASE_SPEED * (1 + 0.15 * R.up.speed) * (P.inWater ? 0.55 : 1);
+  const spd = BASE_SPEED * R.bonus.zori * (1 + 0.15 * R.up.speed) * (P.inWater ? 0.55 : 1);
   let mx = ix * spd * dt, my = iy * spd * dt;
   if (P.kbT > 0) { mx += P.kbx * dt; my += P.kby * dt; P.kbT -= dt; }
   if (mx || my) movePlayer(mx, my);
@@ -1121,7 +1405,7 @@ function update(dt) {
   const c1 = cellIndex(P.x, P.y);
   if (st.terrain[c1] === T_WARM && R.restored[c1] && P.hp < P.hpMax) {
     P.healT += dt;
-    if (P.healT >= 4) { P.healT = 0; P.hp++; hudCache.hp = -1; sfx('heal'); R.parts.push({ x: P.x, y: P.y - 58, vx: 0, vy: -16, life: 0.9, max: 0.9, kind: 'plus', s: 0 }); }
+    if (P.healT >= 4) { P.healT = 0; P.hp++; hudCache.hp = -1; sfx('heal'); R.parts.push({ x: P.x, y: P.y - R.geo.head, vx: 0, vy: -16, life: 0.9, max: 0.9, kind: 'plus', s: 0 }); }
   } else P.healT = 0;
 
   if (G.state === 'clearing') {
@@ -1131,9 +1415,11 @@ function update(dt) {
     return;
   }
 
+  updateFoot(dt);
+
   // ── weapon ──
   R.fireT -= dt;
-  if (R.fireT <= 0) { R.fireT += 0.9 * Math.pow(0.8, R.up.rate); if (R.fireT < 0) R.fireT = 0.05; fire(); }
+  if (R.fireT <= 0) { R.fireT += 0.9 * R.bonus.fan * Math.pow(0.8, R.up.rate); if (R.fireT < 0) R.fireT = 0.05; fire(); }
 
   // ── spawning ──
   const rate = 0.8 + 2.4 * Math.min(R.t, 300) / 300;
@@ -1141,7 +1427,7 @@ function update(dt) {
   while (R.spawnAcc >= 1) { R.spawnAcc -= 1; if (R.enemies.length < 140) spawnOne(); }
 
   // ── enemies ──
-  const tx = P.x, ty = P.y - 22, E = R.enemies;
+  const tx = P.x, ty = P.y - R.geo.mid, E = R.enemies;
   for (const e of E) {
     if (e.dead) continue;
     if (e.spawnT > 0) e.spawnT -= dt;
@@ -1217,6 +1503,8 @@ function updateParticles(dt) {
 /* ── autopilot used only by the debug hook (pacing checks) ── */
 function botInput() {
   const R = run, st = R.stage, P = R.p;
+  // "stand" bot: stays put to let her feet colour the ground whenever no ink is close
+  if (G.botStand && footTarget() >= 0 && !R.enemies.some((e) => Math.hypot(e.x - P.x, e.y - (P.y - R.geo.mid)) < 64 + e.r)) return [0, 0];
   let tx = P.x, ty = P.y, bd = Infinity;
   for (let k = 0; k < R.unrestN; k += 1) {
     const c = R.unrest[k], x = ((c % st.CW) + 0.5) * CELL, y = (((c / st.CW) | 0) + 0.5) * CELL, d = (x - P.x) ** 2 + (y - P.y) ** 2;
@@ -1225,7 +1513,7 @@ function botInput() {
   let vx = tx - P.x, vy = ty - P.y; const d0 = Math.hypot(vx, vy) || 1;
   const pull = bd < 60 * 60 ? 0.3 : 1; vx = (vx / d0) * pull; vy = (vy / d0) * pull;
   for (const e of R.enemies) {
-    const dx = P.x - e.x, dy = P.y - 22 - e.y, d = Math.hypot(dx, dy) || 1, lim = 46 + e.r;
+    const dx = P.x - e.x, dy = P.y - R.geo.mid - e.y, d = Math.hypot(dx, dy) || 1, lim = 46 + e.r;
     if (d < lim) { const w = ((lim - d) / lim) * 3; vx += (dx / d) * w; vy += (dy / d) * w; }
   }
   const m = Math.hypot(vx, vy); return m > 0.05 ? [vx / m, vy / m] : [0, 0];
@@ -1236,7 +1524,7 @@ function botInput() {
    ════════════════════════════════════════════════════════════ */
 const cv = $('cv'), ctx = cv.getContext('2d');
 const low = makeCanvas(16, 16), lctx = low.getContext('2d');
-const view = { devW: 300, devH: 300, k: 1, dpr: 1, hudDev: 0 };
+const view = { devW: 300, devH: 300, k: 1, dpr: 1, hudDev: 0, ox: 0, oy: 0 }; // ox/oy: world → device offset this frame
 const VIEW_MIN_SHORT = 192; // world px always visible across the short side (~200)
 const shimmerRGB = C.shimmer;
 
@@ -1307,22 +1595,48 @@ function render() {
   }
   L.globalAlpha = 1;
 
-  // restore ripples
+  // restore ripples (foot painting leaves a celadon "wet" ring)
   for (const r of R.rings) {
     const u = r.t / r.dur, rad = r.r * (r.big ? u : 0.3 + 0.7 * u);
     L.globalAlpha = (1 - u) * (r.big ? 0.9 : 0.75);
-    L.strokeStyle = r.big ? C.gold : C.paper; L.lineWidth = r.big ? 3 : 1.5;
+    L.strokeStyle = r.big ? C.gold : r.wet ? C.celadon : C.paper; L.lineWidth = r.big ? 3 : 1.5;
     L.beginPath(); L.arc(r.x, r.y, Math.max(0.5, rad), 0, Math.PI * 2); L.stroke();
   }
   L.globalAlpha = 1;
+
+  // foot-painting gauge: the disc about to take colour, filling while she stands still
+  if (P.paintT > 0 && G.state === 'play') {
+    const u = Math.min(1, P.paintT / footCharge()), r = (P.footR + 0.5) * CELL;
+    const fx0 = (Math.floor(P.x / CELL) + 0.5) * CELL, fy0 = (Math.floor(P.y / CELL) + 0.5) * CELL;
+    L.globalAlpha = 0.1 + 0.25 * u; L.fillStyle = C.celadon;
+    L.beginPath(); L.arc(fx0, fy0, Math.max(1, r * u), 0, Math.PI * 2); L.fill();
+    L.globalAlpha = 0.45; L.strokeStyle = C.paper; L.lineWidth = 1;
+    L.beginPath(); L.arc(fx0, fy0, r, 0, Math.PI * 2); L.stroke();
+    L.globalAlpha = 0.95; L.strokeStyle = C.gold; L.lineWidth = 2;
+    L.beginPath(); L.arc(fx0, fy0, r, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * u); L.stroke();
+    L.globalAlpha = 1;
+  }
+
+  // blit the low-res world to the screen, crisp, with sub-pixel camera offset
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.imageSmoothingEnabled = false;
+  ctx.fillStyle = C.ink; ctx.fillRect(0, 0, cv.width, cv.height);
+  const ox = Math.round(-fx * k), oy = Math.round(-fy * k);
+  ctx.drawImage(low, 0, 0, lw, lh, ox, oy, lw * k, lh * k);
+
+  // Entities go straight onto the screen canvas with the same world → device mapping as the blit, so pixel
+  // sprites land on the same grid while a high-resolution heroine keeps every device pixel of detail.
+  const g = ctx;
+  view.ox = ox - ix * k; view.oy = oy - iy * k;
+  g.setTransform(k, 0, 0, k, view.ox, view.oy);
 
   // entities, y-sorted against the heroine
   const E = R.enemies;
   E.sort((a, b) => a.y - b.y);
   let i = 0;
-  for (; i < E.length && E[i].y + E[i].r * 0.6 < P.y; i++) drawEnemy(E[i]);
-  drawPlayer();
-  for (; i < E.length; i++) drawEnemy(E[i]);
+  for (; i < E.length && E[i].y + E[i].r * 0.6 < P.y; i++) drawEnemy(g, E[i]);
+  drawPlayer(g);
+  for (; i < E.length; i++) drawEnemy(g, E[i]);
 
   // wind blades with short fading trails
   for (const b of R.blades) {
@@ -1330,29 +1644,24 @@ function render() {
     const spr = SPR.blade[ai];
     const fade = Math.min(1, b.life / 0.15);
     for (let t = 2; t < b.tr.length; t += 2) {
-      L.globalAlpha = (t === 2 ? 0.35 : 0.15) * fade;
-      L.drawImage(spr, Math.round(b.tr[t] - 7.5), Math.round(b.tr[t + 1] - 7.5));
+      g.globalAlpha = (t === 2 ? 0.35 : 0.15) * fade;
+      g.drawImage(spr, Math.round(b.tr[t] - 7.5), Math.round(b.tr[t + 1] - 7.5));
     }
-    L.globalAlpha = fade;
-    L.drawImage(spr, Math.round(b.x - 7.5), Math.round(b.y - 7.5));
+    g.globalAlpha = fade;
+    g.drawImage(spr, Math.round(b.x - 7.5), Math.round(b.y - 7.5));
   }
-  L.globalAlpha = 1;
+  g.globalAlpha = 1;
 
   // particles
   for (const q of R.parts) {
     const u = q.life / q.max;
-    if (q.kind === 'plus') { L.globalAlpha = Math.min(1, u * 2); L.drawImage(SPR.plus, Math.round(q.x - 2), Math.round(q.y)); continue; }
-    L.globalAlpha = Math.min(1, u * 1.6);
-    L.fillStyle = q.kind === 'hit' ? C.peony : (Math.random() < 0.2 ? C.blobRim : C.blob);
-    L.fillRect(Math.round(q.x), Math.round(q.y), q.s, q.s);
+    if (q.kind === 'plus') { g.globalAlpha = Math.min(1, u * 2); g.drawImage(SPR.plus, Math.round(q.x - 2), Math.round(q.y)); continue; }
+    g.globalAlpha = Math.min(1, u * 1.6);
+    g.fillStyle = q.kind === 'hit' ? C.peony : (Math.random() < 0.2 ? C.blobRim : C.blob);
+    g.fillRect(Math.round(q.x), Math.round(q.y), q.s, q.s);
   }
-  L.globalAlpha = 1;
-
-  // blit the low-res world to the screen, crisp, with sub-pixel camera offset
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.imageSmoothingEnabled = false;
-  ctx.fillStyle = C.ink; ctx.fillRect(0, 0, cv.width, cv.height);
-  ctx.drawImage(low, 0, 0, lw, lh, Math.round(-fx * k), Math.round(-fy * k), lw * k, lh * k);
+  g.globalAlpha = 1;
+  g.setTransform(1, 0, 0, 1, 0, 0);
 
   // floating joystick
   if (joy.active) {
@@ -1365,58 +1674,70 @@ function render() {
   }
 }
 
-function drawPlayer() {
-  const R = run, P = R.p, L = lctx;
-  L.drawImage(SPR.shadow, Math.round(P.x - 7), Math.round(P.y - 3));
-  if (P.inv > 0 && P.inv < 0.88 && G.state === 'play' && Math.floor(P.inv * 14) % 2 === 0) return; // blink
-  const A = SPR.aoi || {}, since = R.time - P.fireAt;
-  const attacking = !!A.attack && since >= 0 && since < ATK_F0 + ATK_F1;
-  // walk frames carry their own motion, so the bob only applies when still (or without a walk sheet)
-  const bob = P.moving ? (A.walk ? 0 : Math.floor(R.time / 0.14) % 2) : Math.floor(R.time / 0.4) % 2;
-  const frameIndex = attacking ? (since < ATK_F0 ? 0 : 1) : P.moving ? WALK_LOOP[Math.floor(R.time / WALK_DT) % WALK_LOOP.length] : 0;
-  const white = P.inv > 0.88 && G.state === 'play';
-  heroFrame = (attacking ? 'a' : 'w') + frameIndex;
-  drawHero(L, Math.round(P.x), Math.round(P.y) + 1 - bob, frameIndex, P.facing > 0, white, attacking);
-}
-const WALK_LOOP = [1, 2, 3, 2], WALK_DT = 0.15, ATK_F0 = 0.06, ATK_F1 = 0.11;
+const ATK_F0 = 0.06, ATK_F1 = 0.11; // fan swing: raised, then swept
 let heroFrame = 'w0';
-// Single entry point for the heroine sprite: (x, y) = feet in world px.
-// Uses the 4-frame walk sheet / 2-frame attack sheet (28×54 frames, feet anchor
-// x=16, y=54) when loaded; falls back to the single still image otherwise.
-function drawHero(g, x, y, frameIndex, flip, white, attacking) {
-  const A = SPR.aoi; if (!A) return;
-  const atk = attacking && A.attack;
-  const sheet = atk ? (white && A.attackW) || A.attack : A.walk ? (white && A.walkW) || A.walk : null;
-  if (sheet) {
-    const fw = 28, fh = 54, n = Math.max(1, Math.floor(sheet.width / fw)), f = frameIndex % n, axr = 16;
-    g.save();
-    if (flip) { g.translate(x, 0); g.scale(-1, 1); g.drawImage(sheet, f * fw, 0, fw, fh, -axr, y - fh, fw, fh); }
-    else g.drawImage(sheet, f * fw, 0, fw, fh, x - axr, y - fh, fw, fh);
+// The heroine, feet at (P.x, P.y). Drawn sheets play their frames (walk loop, fan sweep, a 1px bob at rest);
+// a single still moves procedurally: a hop and sway while walking, breathing at rest, a lean on each swing.
+function drawPlayer(g) {
+  const R = run, P = R.p, CH = R.ch;
+  g.drawImage(SPR.shadow, Math.round(P.x - 7), Math.round(P.y - 3));
+  if (P.inv > 0 && P.inv < 0.88 && G.state === 'play' && Math.floor(P.inv * 14) % 2 === 0) return; // blink
+  const since = R.time - P.fireAt, swing = since >= 0 && since < ATK_F0 + ATK_F1;
+  const white = P.inv > 0.88 && G.state === 'play';
+  const flip = CH.faces === 'left' ? P.facing > 0 : P.facing < 0;
+  const attacking = swing && !!CH.attack;
+  let f = 0, bob = 0, rot = 0, sx = 1, sy = 1;
+  if (!CH.procedural) {
+    const n = attacking ? CH.attack.length : 0;
+    if (attacking) f = n === 2 ? (since < ATK_F0 ? 0 : 1) : Math.min(n - 1, Math.floor((since / (ATK_F0 + ATK_F1)) * n));
+    else if (P.moving) f = CH.loop[Math.floor(R.time / CH.dt) % CH.loop.length];
+    bob = P.moving ? 0 : Math.floor(R.time / 0.4) % 2;
+  } else {
+    const t = R.time;
+    if (P.moving) { const ph = (t / 0.3) * Math.PI; bob = Math.abs(Math.sin(ph)) * CH.H * 0.04; rot = Math.sin(ph) * 0.05; sy = 1 - 0.025 * Math.abs(Math.cos(ph)); }
+    else { bob = 0; sy = 1 + 0.012 * Math.sin(t * 2.6); }
+    if (swing) { const e = Math.sin(((since / (ATK_F0 + ATK_F1)) * Math.PI)); rot += (P.facing > 0 ? 1 : -1) * 0.09 * e; sy *= 1 + 0.03 * e; }
+    sx = 1 + (1 - sy) * 0.6;
+    if (CH.pixel) { bob = Math.round(bob); rot = 0; sx = sy = 1; } // pixel stills only hop
+  }
+  heroFrame = (attacking ? 'a' : 'w') + f;
+  if (CH.pixel) {
+    const list = attacking ? (white ? CH.attackW : CH.attack) : (white ? CH.walkW : CH.walk), img = list[f], s = CH.s;
+    g.save(); g.translate(Math.round(P.x), Math.round(P.y) + 1 - bob);
+    if (flip) g.scale(-1, 1);
+    g.drawImage(img, -CH.ax * s, -CH.ay * s, img.width * s, img.height * s);
     g.restore();
     return;
   }
-  const ax = flip ? A.w - 15 : 15;
-  const img = white ? (flip ? A.wR : A.wL) : (flip ? A.R : A.L);
-  g.drawImage(img, x - ax, y - A.h);
+  // high resolution: draw the pre-shrunk frame 1:1 in device pixels
+  const k = view.k, C2 = heroScaled(CH, k);
+  const img = (attacking ? (white ? C2.attackW : C2.attack) : (white ? C2.walkW : C2.walk))[f];
+  g.save();
+  g.setTransform(1, 0, 0, 1, P.x * k + view.ox, (P.y + 1 - bob) * k + view.oy);
+  if (rot) g.rotate(rot);
+  g.scale(flip ? -sx : sx, sy);
+  g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high';
+  g.drawImage(img, -CH.ax * C2.sc, -CH.ay * C2.sc);
+  g.restore();
 }
 
-function drawEnemy(e) {
-  const L = lctx, R = run, set = SPR.blob[e.boss ? 18 : e.r];
+function drawEnemy(g, e) {
+  const R = run, set = SPR.blob[e.boss ? 18 : e.r];
   const v = e.flash > 0 ? set.f : (e.inWater ? set.t : set.n);
   const fi = Math.floor(R.time * 6 + e.seed * 10) % 6, spr = v.frames[fi], s = v.size;
   const bob = Math.round(Math.sin(R.time * 3 + e.seed) * (e.boss ? 2 : 1));
   const a = e.spawnT > 0 ? Math.max(0, 1 - e.spawnT / (e.boss ? 0.8 : 0.4)) : 1;
-  L.globalAlpha = a * 0.5;
-  L.drawImage(SPR.shadow, Math.round(e.x - 7), Math.round(e.y + e.r + 3), 14, e.boss ? 6 : 4);
+  g.globalAlpha = a * 0.5;
+  g.drawImage(SPR.shadow, Math.round(e.x - 7), Math.round(e.y + e.r + 3), 14, e.boss ? 6 : 4);
   if (e.type === 'wisp' && (e.vx || e.vy)) {
     const sp = Math.hypot(e.vx, e.vy) || 1;
-    L.fillStyle = C.blob;
-    L.globalAlpha = a * 0.45; L.fillRect(Math.round(e.x - (e.vx / sp) * 6) - 1, Math.round(e.y - (e.vy / sp) * 6) - 1, 3, 2);
-    L.globalAlpha = a * 0.22; L.fillRect(Math.round(e.x - (e.vx / sp) * 10), Math.round(e.y - (e.vy / sp) * 10), 2, 2);
+    g.fillStyle = C.blob;
+    g.globalAlpha = a * 0.45; g.fillRect(Math.round(e.x - (e.vx / sp) * 6) - 1, Math.round(e.y - (e.vy / sp) * 6) - 1, 3, 2);
+    g.globalAlpha = a * 0.22; g.fillRect(Math.round(e.x - (e.vx / sp) * 10), Math.round(e.y - (e.vy / sp) * 10), 2, 2);
   }
-  L.globalAlpha = a;
-  L.drawImage(spr, Math.round(e.x - s / 2), Math.round(e.y - s / 2 + bob));
-  L.globalAlpha = 1;
+  g.globalAlpha = a;
+  g.drawImage(spr, Math.round(e.x - s / 2), Math.round(e.y - s / 2 + bob));
+  g.globalAlpha = 1;
 }
 
 /* ════════════════════════════════════════════════════════════
@@ -1521,7 +1842,7 @@ function resume() {
 
 /* ── run lifecycle ── */
 function startRun() {
-  const st = G.stages[G.selected]; if (!st || !SPR.aoi) return;
+  const st = G.stages[G.selected]; if (!st || !G.chars[G.char]) return;
   G.stage = st; newRun(st);
   for (const k in hudCache) hudCache[k] = k === 'clock' ? '' : (typeof hudCache[k] === 'number' ? -2 : null);
   $('upOv').classList.remove('on'); $('pauseOv').classList.remove('on'); $('banner').classList.remove('show');
@@ -1539,7 +1860,12 @@ function endRun(kind) {
   G.state = 'result';
   const prev = store.get(bestKey(st));
   const isBest = !prev || rec > prev.pct || (rec === prev.pct && kind === 'clear' && prev.outcome === 'clear' && R.t < prev.time);
-  if (isBest && rec > 0) store.set(bestKey(st), { pct: rec, time: Math.floor(R.t), outcome: kind });
+  // autopilot (debug pacing) runs touch neither the records nor the 香料
+  if (isBest && rec > 0 && !G.bot) store.set(bestKey(st), { pct: rec, time: Math.floor(R.t), outcome: kind });
+  // 香料: 1 per % restored, +30 for a clear; a fall keeps only part of it (風呂敷 raises that share)
+  const earned = G.bot ? 0 : Math.floor((p + (kind === 'clear' ? 30 : 0)) * (kind === 'death' ? R.bonus.cloth : 1));
+  if (earned > 0) { META.koryo += earned; saveMeta(); }
+  $('rEarn').innerHTML = earned > 0 ? `${CURRENCY} <b>+${earned}</b>　所持 <b>${META.koryo}</b>　（タイトルの工房で使える）` : '';
   // result UI
   const T = { clear: ['彩、還る。', '大墨を祓い、すべての色が還った。'], retreat: ['撤収', '取り戻した色を持ち帰った。記録はそのまま残る。'], death: ['墨に呑まれた', '倒れてしまった。記録は半分になる。'] }[kind];
   $('rTitle').textContent = T[0]; $('rTitle').classList.toggle('clear', kind === 'clear');
@@ -1601,7 +1927,109 @@ function renderPreview() {
   const b = store.get(bestKey(st));
   const oc = { clear: '還', retreat: '撤収', death: '倒れた' };
   $('pvBest').innerHTML = b ? `最高記録 <b>${b.pct}%</b>（${oc[b.outcome] || ''}・${fmtTime(b.time)}）` : '最高記録 <b>―</b> まだ記録はない';
-  $('startBtn').disabled = !SPR.aoi;
+  $('startBtn').disabled = !G.chars[G.char];
+}
+
+/* ── title / character select ── */
+const CHAR_KEY = 'irogaeshi:char';
+function charCardFor(id) { return document.querySelector(`.ccard[data-char="${id}"]`); }
+function drawCharThumb(canvas, CH) {
+  const g = canvas.getContext('2d'), W = canvas.width, H = canvas.height, f = CH.walk[0];
+  g.clearRect(0, 0, W, H); g.fillStyle = C.ink; g.fillRect(0, 0, W, H);
+  const s = Math.min((W - 4) / f.width, (H - 4) / f.height), ss = CH.pixel && s >= 1 ? Math.floor(s) : s;
+  g.imageSmoothingEnabled = !CH.pixel; g.imageSmoothingQuality = 'high';
+  g.drawImage(f, Math.round((W - f.width * ss) / 2), Math.round(H - 2 - f.height * ss), f.width * ss, f.height * ss);
+}
+function renderPortrait() {
+  const CH = G.chars[G.char], img = $('portraitImg');
+  if (!CH) return;
+  img.src = CH.portrait; img.alt = CH.alt;
+  img.classList.toggle('smooth', !CH.pixel);
+}
+function selectChar(id) {
+  G.char = id;
+  document.querySelectorAll('.ccard').forEach((c) => c.setAttribute('aria-pressed', String(c.dataset.char === id)));
+  if (id !== 'upload') store.set(CHAR_KEY, id);
+  renderPortrait(); renderPreview();
+}
+function buildCharCards() {
+  const box = $('ccards'); box.textContent = '';
+  const mk = (id, name, desc, upload) => {
+    const b = document.createElement('button'); b.type = 'button'; b.className = 'ccard'; b.dataset.char = id; b.setAttribute('aria-pressed', 'false');
+    b.innerHTML = (upload ? '<span class="ph" aria-hidden="true">＋</span><canvas width="88" height="112" aria-hidden="true" hidden></canvas>' : '<canvas width="88" height="112" aria-hidden="true"></canvas>') + '<span class="nm"></span><span class="ds"></span>';
+    b.querySelector('.nm').textContent = name; b.querySelector('.ds').textContent = desc;
+    b.addEventListener('click', () => {
+      sfx('click');
+      if (upload && (!G.chars.upload || G.char === 'upload')) { $('cfile').value = ''; $('cfile').click(); return; }
+      selectChar(id);
+    });
+    box.appendChild(b);
+  };
+  for (const d of CHARACTER_DEFS) mk(d.id, d.name, d.desc || '', false);
+  mk('upload', '画像から', '好きな画像で遊ぶ', true);
+}
+function handleCharFile(file) {
+  if (!file) return;
+  const fail = () => { $('pvMsg').textContent = 'このキャラクター画像は読み込めなかった。別の画像を試してほしい。'; $('pvMsg').hidden = false; };
+  const reader = new FileReader();
+  reader.onerror = fail;
+  reader.onload = () => {
+    loadImg(reader.result).then((img) => {
+      const nm = (file.name || '画像').replace(/\.[^.]+$/, '');
+      const CH = makeCharacter({ id: 'upload', name: nm, alt: `読み込んだ画像のキャラクター「${nm}」` }, { sprite: img });
+      G.chars.upload = CH;
+      const card = charCardFor('upload'), cvs = card.querySelector('canvas');
+      card.querySelector('.ph').hidden = true; cvs.hidden = false; drawCharThumb(cvs, CH);
+      card.querySelector('.nm').textContent = nm; card.querySelector('.ds').textContent = 'もう一度押すと変更';
+      selectChar('upload');
+    }).catch(fail);
+  };
+  reader.readAsDataURL(file);
+}
+
+/* ── 工房 (workshop) ── */
+function updateWallet() { $('shopWallet').textContent = String(META.koryo); $('shopCur').textContent = CURRENCY; }
+function renderShop(focusId) {
+  $('shopSub').innerHTML = `所持 <b>${META.koryo}</b> ${CURRENCY} ― 道具を手入れすると、次の旅が少しだけ楽になる`;
+  const box = $('shopList'); box.textContent = '';
+  for (const it of SHOP) {
+    const lv = META.lv[it.id] | 0, maxed = lv >= it.max, cost = shopCost(it, lv);
+    const el = document.createElement('div'); el.className = 'sitem';
+    el.innerHTML = '<div class="s-h"><span class="s-tool" aria-hidden="true"></span><span class="s-name"></span><span class="s-smith"></span></div><p class="s-desc"></p><div class="s-eff"></div><div class="s-row"><div class="pips" aria-hidden="true"></div><span class="s-lv"></span><button type="button" class="btn s-buy"></button></div>';
+    el.querySelector('.s-tool').textContent = it.tool;
+    el.querySelector('.s-name').textContent = it.name;
+    el.querySelector('.s-smith').textContent = it.smith;
+    el.querySelector('.s-desc').textContent = it.desc;
+    el.querySelector('.pips').innerHTML = Array.from({ length: it.max }, (_, i) => `<i class="pip${i < lv ? ' on' : ''}"></i>`).join('');
+    el.querySelector('.s-eff').textContent = `${it.stat}　${lv ? it.fmt(lv) : '±0'}${maxed ? '' : ` → ${it.fmt(lv + 1)}`}`;
+    el.querySelector('.s-lv').textContent = `Lv ${lv}/${it.max}`;
+    const buy = el.querySelector('.s-buy');
+    buy.textContent = maxed ? '最大' : `${cost} ${CURRENCY}`;
+    buy.disabled = maxed || META.koryo < cost;
+    buy.setAttribute('aria-label', maxed ? `${it.name}（最大）` : `${it.name}を手入れする（${cost} ${CURRENCY}）`);
+    buy.addEventListener('click', () => {
+      if (maxed || META.koryo < cost) return;
+      META.koryo -= cost; META.lv[it.id] = lv + 1; saveMeta();
+      sfx('upgrade'); renderShop(it.id); updateWallet();
+    });
+    buy.dataset.id = it.id;
+    box.appendChild(el);
+  }
+  if (focusId) {
+    const b = box.querySelector(`.s-buy[data-id="${focusId}"]`);
+    (b && !b.disabled ? b : $('shopClose')).focus({ preventScroll: true });
+  }
+}
+function openShop() {
+  renderShop();
+  $('shopOv').classList.add('on');
+  const b = $('shopList').querySelector('.s-buy:not(:disabled)') || $('shopClose');
+  b.focus({ preventScroll: true });
+}
+function closeShop() { $('shopOv').classList.remove('on'); $('shopBtn').focus({ preventScroll: true }); }
+function toTitle() {
+  for (const id of ['upOv', 'pauseOv']) $(id).classList.remove('on');
+  G.state = 'title'; showScreen('title'); renderPreview(); updateWallet();
 }
 
 function handleFile(file) {
@@ -1634,6 +2062,8 @@ function handleFile(file) {
    ════════════════════════════════════════════════════════════ */
 const KEYMAP = { KeyW: 'up', ArrowUp: 'up', KeyS: 'down', ArrowDown: 'down', KeyA: 'left', ArrowLeft: 'left', KeyD: 'right', ArrowRight: 'right' };
 window.addEventListener('keydown', (e) => {
+  if (e.target instanceof HTMLInputElement) return; // typing in the debug panel
+  if (e.code === 'Escape' && $('shopOv').classList.contains('on')) { e.preventDefault(); closeShop(); return; }
   if (G.screen !== 'game') return;
   const dir = KEYMAP[e.code];
   if (dir) { keys.add(dir); e.preventDefault(); return; }
@@ -1672,10 +2102,13 @@ document.addEventListener('touchmove', (e) => { if (G.screen === 'game') e.preve
 
 $('pauseBtn').addEventListener('click', () => { sfx('click'); pause(); });
 $('resumeBtn').addEventListener('click', () => { sfx('click'); resume(); });
-$('quitBtn').addEventListener('click', () => { sfx('click'); $('pauseOv').classList.remove('on'); G.state = 'title'; showScreen('title'); renderPreview(); });
+$('quitBtn').addEventListener('click', () => { sfx('click'); toTitle(); });
 $('retreatBtn').addEventListener('click', () => { if (G.state === 'play' && pct() >= 60) { sfx('retreat'); endRun('retreat'); } });
 $('againBtn').addEventListener('click', () => { sfx('click'); startRun(); });
-$('backBtn').addEventListener('click', () => { sfx('click'); G.state = 'title'; showScreen('title'); renderPreview(); const c = cardFor(G.selected); if (c) c.focus({ preventScroll: true }); });
+$('backBtn').addEventListener('click', () => { sfx('click'); toTitle(); const c = cardFor(G.selected); if (c) c.focus({ preventScroll: true }); });
+$('shopBtn').addEventListener('click', () => { sfx('click'); openShop(); });
+$('shopClose').addEventListener('click', () => { sfx('click'); closeShop(); });
+$('shopOv').addEventListener('click', (e) => { if (e.target === e.currentTarget) closeShop(); });
 $('startBtn').addEventListener('click', () => { try { window.SFX && window.SFX.unlock(); } catch (e) { /* ignore */ } sfx('click'); startRun(); });
 
 // sound toggle (title + HUD); state persisted by sfx.js
@@ -1715,6 +2148,7 @@ function buildCards() {
   mk('upload', '画像からつくる', '好きな画像を選ぶ', true);
 }
 $('file').addEventListener('change', (e) => handleFile(e.target.files && e.target.files[0]));
+$('cfile').addEventListener('change', (e) => handleCharFile(e.target.files && e.target.files[0]));
 
 document.addEventListener('visibilitychange', () => { if (document.hidden) pause(); last = performance.now(); });
 if (window.ResizeObserver) { const ro = new ResizeObserver(() => { if (G.screen === 'game') resize(); }); ro.observe($('play')); ro.observe($('hud')); }
@@ -1734,9 +2168,10 @@ function frame(now) {
 }
 
 function boot() {
-  $('portraitImg').src = PORTRAIT_URI;
+  loadMeta(); updateWallet();
+  if (DEBUG) loadDebugTune();
   prepSmall(); prepBlobs(); prepBlades();
-  buildCards();
+  buildCards(); buildCharCards();
   const ready = (def, src, w, h) => {
     G.stages[def.id] = buildStage(src, w, h, { key: def.id, name: def.name });
     drawCover(cardFor(def.id).querySelector('canvas'), G.stages[def.id].colorCanvas);
@@ -1748,44 +2183,140 @@ function boot() {
     else loadImg(def.src).then((img) => ready(def, img, img.naturalWidth, img.naturalHeight)).catch(() => {});
   }
   selectStage(G.selected);
-  const opt = (u) => loadImg(u).catch(() => null);
-  Promise.all([loadImg(SPRITE_URI), opt(AOI_WALK_URI), opt(AOI_ATTACK_URI)]).then(([img, walk, attack]) => { prepSprites(img, walk, attack); renderPreview(); }).catch(() => { $('pvMsg').textContent = '画像の読み込みに失敗した。'; $('pvMsg').hidden = false; });
+  const saved = store.get(CHAR_KEY);
+  selectChar(CHARACTER_DEFS.some((d) => d.id === saved) ? saved : CHARACTER_DEFS.length ? CHARACTER_DEFS[0].id : 'upload');
+  for (const def of CHARACTER_DEFS) {
+    loadCharacter(def).then((CH) => {
+      G.chars[def.id] = CH;
+      drawCharThumb(charCardFor(def.id).querySelector('canvas'), CH);
+      if (G.char === def.id) { renderPortrait(); renderPreview(); }
+    }).catch(() => { charCardFor(def.id).querySelector('.ds').textContent = '画像を読み込めなかった'; });
+  }
+  if (DEBUG) buildDebug();
   requestAnimationFrame(frame);
 }
 
 /* ════════════════════════════════════════════════════════════
-   10. Debug hook (automated tests) — only exposed when loaded with #debug
+   10. Debug — only with #debug in the URL: an on-screen panel
+   (foot-painting timings, test switches, pacing runs) and the
+   window.__dbg hook used by automated tests
    ════════════════════════════════════════════════════════════ */
-if (location.hash === '#debug') window.__dbg = {
-  G, get run() { return run; }, pct, TUNE, ENEMY, stats: (k) => G.stages[k] && G.stages[k].stats,
-  start(key) { if (key) selectStage(key); startRun(); },
-  forcePct(target) {
-    const R = run, st = R.stage, need = Math.ceil((target / 100) * st.playableCount);
-    while (R.restoredPlayable < need && R.unrestN > 0) {
-      const c = R.unrest[(Math.random() * R.unrestN) | 0]; R.queued[c] = 1; applyRestore(c);
+const DEBUG_KEY = 'irogaeshi:debug';
+function loadDebugTune() {
+  const s = store.get(DEBUG_KEY);
+  if (s && s.foot) for (const k in FOOT) if (typeof s.foot[k] === 'number' && isFinite(s.foot[k]) && s.foot[k] >= 0) FOOT[k] = s.foot[k];
+}
+const saveDebugTune = () => store.set(DEBUG_KEY, { foot: FOOT });
+
+// synchronous autopilot for pacing checks; never touches records or 香料
+function autoplay(seconds, god) {
+  const out = { marks: {}, died: null }, keepGod = G.god;
+  G.bot = true; G.god = !!god;
+  const dt = 1 / 30, steps = Math.round(seconds / dt);
+  for (let i = 0; i < steps; i++) {
+    if (G.state === 'upgrade') chooseUpgrade((Math.random() * 3) | 0);
+    if (G.state === 'result') { out.died = +run.t.toFixed(1); break; }
+    if (G.state === 'play' || G.state === 'clearing') update(dt);
+    const p = pct();
+    for (const m of [15, 30, 45, 60, 75, 85]) if (p >= m && out.marks[m] == null) out.marks[m] = +run.t.toFixed(1);
+  }
+  G.bot = false; G.god = keepGod;
+  Object.assign(out, { t: +run.t.toFixed(1), pct: +pct().toFixed(1), kills: run.kills, hp: run.p.hp, state: G.state, enemies: run.enemies.length, up: { ...run.up }, foot: +((run.footCells / run.stage.playableCount) * 100).toFixed(1) });
+  return out;
+}
+function forcePct(target) {
+  const R = run, st = R.stage, need = Math.ceil((target / 100) * st.playableCount);
+  while (R.restoredPlayable < need && R.unrestN > 0) {
+    const c = R.unrest[(Math.random() * R.unrestN) | 0]; R.queued[c] = 1; applyRestore(c);
+  }
+  return pct();
+}
+
+function buildDebug() {
+  const FIELDS = [
+    ['delay', '止まってから溜め始めるまで', '秒', 0.1],
+    ['charge', '溜め始めてから濡れるまで', '秒', 0.1],
+    ['radius', '最初に塗る半径', 'マス', 1],
+    ['grow', '立ち続けると広がる', 'マス/回', 1],
+    ['maxRadius', '広がる上限の半径', 'マス', 1],
+  ];
+  const box = document.createElement('div'); box.className = 'dbg';
+  box.innerHTML = `<div class="dbg-p" id="dbgP" role="region" aria-label="デバッグ" hidden>
+    <h3>足元塗り</h3>
+    ${FIELDS.map(([k, l, u, s]) => `<label><span>${l}</span><input type="number" min="0" step="${s}" data-foot="${k}"><span>${u}</span></label>`).join('')}
+    <div class="row"><button type="button" data-act="footReset">初期値に戻す</button><button type="button" data-act="footCopy">値をコピー</button></div>
+    <h3>テスト</h3>
+    <label class="ck"><input type="checkbox" data-flag="god"><span>無敵</span></label>
+    <label class="ck"><input type="checkbox" data-flag="noMeta"><span>工房の強化を切る（次のプレイから）</span></label>
+    <div class="row"><button type="button" data-act="pct">復元率 +10%</button><button type="button" data-act="boss">ボスを出す</button></div>
+    <div class="row"><button type="button" data-act="koryo">${CURRENCY} +100</button><button type="button" data-act="metaReset">工房をリセット</button></div>
+    <h3>ペース計測</h3>
+    <p class="out">選んでいるステージをボットが3回遊び、ボス出現（85%）までの時間を測る。工房の強化は切って測る。数秒かかる。</p>
+    <div class="row"><button type="button" data-act="paceMove">歩き続ける操作</button><button type="button" data-act="paceStand">安全なら止まる操作</button></div>
+    <p class="out" id="dbgOut" aria-live="polite"></p>
+  </div><button type="button" class="dbg-tg" id="dbgTg" aria-expanded="false" aria-controls="dbgP">DEBUG</button>`;
+  document.body.appendChild(box);
+  const panel = $('dbgP'), out = $('dbgOut');
+  const sync = () => {
+    box.querySelectorAll('[data-foot]').forEach((el) => { el.value = String(FOOT[el.dataset.foot]); });
+    box.querySelectorAll('[data-flag]').forEach((el) => { el.checked = !!G[el.dataset.flag]; });
+  };
+  sync();
+  $('dbgTg').addEventListener('click', (e) => {
+    panel.hidden = !panel.hidden; e.currentTarget.setAttribute('aria-expanded', String(!panel.hidden));
+    if (e.detail > 0) e.currentTarget.blur(); // keep the arrow keys for play
+  });
+  box.addEventListener('input', (e) => {
+    const el = e.target;
+    if (el.dataset.foot) {
+      const v = parseFloat(el.value);
+      if (!isFinite(v) || v < 0) return;
+      FOOT[el.dataset.foot] = el.step === '1' ? Math.round(v) : v;
+      saveDebugTune();
+    } else if (el.dataset.flag) G[el.dataset.flag] = el.checked;
+  });
+  const pace = (stand) => {
+    const st = G.stages[G.selected];
+    if (!st || !G.chars[G.char]) { out.textContent = 'ステージかキャラクターがまだ読み込まれていない。'; return; }
+    out.textContent = '計測中…';
+    setTimeout(() => {
+      const keepMeta = G.noMeta, rows = [];
+      G.noMeta = true; G.botStand = stand;
+      try { for (let i = 0; i < 3; i++) { startRun(); rows.push(autoplay(600, true)); } }
+      finally { G.noMeta = keepMeta; G.botStand = false; toTitle(); }
+      const boss = rows.map((r) => r.marks[85]).filter((v) => v != null);
+      const avg = (a) => (a.length ? a.reduce((s, v) => s + v, 0) / a.length : NaN);
+      out.textContent = `${st.name}・${stand ? '安全なら止まる' : '歩き続ける'}操作\nボス出現まで 平均 ${Math.round(avg(boss))}秒（${rows.map((r) => (r.marks[85] != null ? Math.round(r.marks[85]) : '―')).join(' / ')}）\n足元塗りで戻した割合 平均 ${avg(rows.map((r) => r.foot)).toFixed(1)}%`;
+    }, 30);
+  };
+  box.addEventListener('click', (e) => {
+    const act = e.target.dataset && e.target.dataset.act; if (!act) return;
+    const inRun = G.screen === 'game' && run && (G.state === 'play' || G.state === 'paused');
+    if (act === 'footReset') { Object.assign(FOOT, FOOT_DEFAULT); saveDebugTune(); sync(); out.textContent = '初期値に戻した。'; }
+    else if (act === 'footCopy') {
+      const text = `const FOOT = ${JSON.stringify(FOOT).replace(/"(\w+)":/g, '$1: ').replace(/,/g, ', ')};`;
+      out.textContent = text;
+      try { navigator.clipboard.writeText(text).then(() => { out.textContent = `${text}\n（コピーした）`; }, () => {}); } catch (err) { /* shown above */ }
     }
-    return pct();
-  },
+    else if (act === 'pct') out.textContent = inRun ? `復元率 ${Math.floor(forcePct(pct() + 10))}%` : 'プレイ中に使う。';
+    else if (act === 'boss') { if (inRun && !run.bossSpawned) spawnBoss(); else out.textContent = 'プレイ中に使う（ボスは1回だけ）。'; }
+    else if (act === 'koryo') { META.koryo += 100; saveMeta(); updateWallet(); out.textContent = `${CURRENCY} ${META.koryo}`; }
+    else if (act === 'metaReset') { META.koryo = 0; for (const it of SHOP) META.lv[it.id] = 0; saveMeta(); updateWallet(); out.textContent = '工房をリセットした。'; }
+    else if (act === 'paceMove') pace(false);
+    else if (act === 'paceStand') pace(true);
+  });
+}
+
+if (DEBUG) window.__dbg = {
+  G, get run() { return run; }, pct, TUNE, ENEMY, FOOT, META, SHOP, stats: (k) => G.stages[k] && G.stages[k].stats,
+  start(key) { if (key) selectStage(key); startRun(); },
+  forcePct,
   spawnBoss() { if (!run.bossSpawned) spawnBoss(); },
   killBoss() { if (run.boss) { hurtEnemy(run.boss, 1e9); } },
-  chooseUpgrade, pause, resume,
+  chooseUpgrade, pause, resume, selectChar, toTitle,
   setGod(v) { G.god = !!v; },
-  // synchronous autopilot for pacing checks
-  autoplay(seconds, god) {
-    const out = { marks: {}, died: null };
-    G.bot = true; G.god = !!god;
-    const dt = 1 / 30, steps = Math.round(seconds / dt);
-    for (let i = 0; i < steps; i++) {
-      if (G.state === 'upgrade') chooseUpgrade((Math.random() * 3) | 0);
-      if (G.state === 'result') { out.died = +run.t.toFixed(1); break; }
-      if (G.state === 'play' || G.state === 'clearing') update(dt);
-      const p = pct();
-      for (const m of [15, 30, 45, 60, 75, 85]) if (p >= m && out.marks[m] == null) out.marks[m] = +run.t.toFixed(1);
-    }
-    G.bot = false; G.god = false;
-    Object.assign(out, { t: +run.t.toFixed(1), pct: +pct().toFixed(1), kills: run.kills, hp: run.p.hp, state: G.state, enemies: run.enemies.length, up: { ...run.up } });
-    return out;
-  },
+  // stand: the bot stops to let her feet paint whenever no ink is close
+  autoplay(seconds, god, stand) { G.botStand = !!stand; try { return autoplay(seconds, god); } finally { G.botStand = false; } },
   get heroFrame() { return heroFrame; },
   stageImages(k) { const st = G.stages[k]; return { color: st.colorCanvas.toDataURL(), gray: st.grayCanvas.toDataURL(), terrain: terrainCanvas(st).toDataURL() }; },
   buildFromCanvas(w, h, painter) { const c = makeCanvas(w, h); painter(c.getContext('2d'), w, h); return buildStage(c, w, h, { key: 'test', name: 'test' }); },

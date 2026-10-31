@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate aoi_walk.png / aoi_attack.png + previews from aoi_sprite.png.
+"""Generate characters/aoi/walk.png / attack.png + previews from characters/aoi/sprite.png.
 
 All edits are done on the "body" layer (outline stripped); the 1px light outline
 is regenerated for every frame (transparent px 4-adjacent to body -> outline).
@@ -9,8 +9,8 @@ import numpy as np
 from PIL import Image
 
 import pathlib
-ASSETS = str(pathlib.Path(__file__).resolve().parent.parent / 'assets')
-SRC = f'{ASSETS}/aoi_sprite.png'
+ASSETS = str(pathlib.Path(__file__).resolve().parent.parent / 'characters' / 'aoi')
+SRC = f'{ASSETS}/sprite.png'
 H, W = 54, 28
 OL = np.array([232, 226, 214, 255], dtype=np.uint8)
 TRANSP = np.zeros(4, dtype=np.uint8)
@@ -276,8 +276,8 @@ def main():
     walk = [src] + [add_outline(b) for b in walk_b[1:]]
     atk = [add_outline(b) for b in make_attack_frames(body)]
 
-    to_img(sheet(walk)).save(f'{ASSETS}/aoi_walk.png')
-    to_img(sheet(atk)).save(f'{ASSETS}/aoi_attack.png')
+    to_img(sheet(walk)).save(f'{ASSETS}/walk.png')
+    to_img(sheet(atk)).save(f'{ASSETS}/attack.png')
     preview(walk).save(f'{ASSETS}/preview_walk.png')
     preview(atk).save(f'{ASSETS}/preview_attack.png')
 
