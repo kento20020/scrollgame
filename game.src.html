@@ -259,7 +259,7 @@ button{font:inherit;color:inherit}
           <h2>遊び方</h2>
           <p>移動＝WASD／矢印キー。スマホは画面をドラッグ。攻撃は自動。</p>
           <p>墨を祓うと、その場所に色が還る。色の戻った場所では墨が湧かない。</p>
-          <p>立ち止まっていると、やがて足元に色がにじむ。</p>
+          <p>復元率が60%を超えると、立ち止まったときに足元に色がにじむ。</p>
         </div>
         <div class="t-btns">
           <button type="button" class="snd snd-t" id="muteTitle" data-muted="false"><svg viewBox="0 0 18 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 5.5h3l4-3.5v12l-4-3.5H2z" fill="currentColor" stroke="none"/><path class="w" d="M12 5.2q1.6 2.8 0 5.6M14.4 3.2q3 4.8 0 9.6"/><path class="x" d="M12 5.5l4.5 5M16.5 5.5l-4.5 5"/></svg><span class="snd-l">音 あり</span></button>
@@ -309,7 +309,7 @@ button{font:inherit;color:inherit}
           <div class="bar" id="bar" role="progressbar" aria-label="復元率" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
             <div class="fill" id="fill"></div>
             <i class="tk" style="left:15%"></i><i class="tk" style="left:30%"></i><i class="tk" style="left:45%"></i><i class="tk" style="left:60%"></i><i class="tk" style="left:75%"></i>
-            <b class="bm" style="left:85%"><span>ボス</span></b>
+            <b class="bm" id="bossMark" style="left:75%"><span>ボス</span></b>
           </div>
           <span class="pct" id="pct">0%</span>
         </div>
@@ -1014,7 +1014,6 @@ const heroGeo = (H) => ({ top: (H * 40) / 54, bot: (H * 10) / 54, fan: (H * 26) 
    4. Run state
    ════════════════════════════════════════════════════════════ */
 const THRESHOLDS = [15, 30, 45, 60, 75];
-const BOSS_AT = 85;
 const ENEMY = {
   blot: { hp: 2, spd: 30, r: 5, rr: 3 },
   wisp: { hp: 1, spd: 52, r: 4, rr: 2 },
@@ -1023,11 +1022,13 @@ const ENEMY = {
 // Pacing knobs. discBias: restore disc uses d² ≤ r² + discBias.
 // topUp: if a kill lands mostly on already-restored ground, the ripple keeps
 // going to the nearest gray cells until (topUp × disc size) new cells are restored.
-const TUNE = { discBias: 1, topUp: 0.24, rrScale: 0.62 };
-// Foot painting: stand still for `delay` s and the gauge starts; `charge` s later the ground under her
-// feet takes colour (a disc of `radius` cells). Standing on repeats it, `grow` cells wider each time up to
-// `maxRadius`. Moving, knockback or a hit resets it. All of it can be tuned from the #debug panel.
-const FOOT = { delay: 1.0, charge: 3.0, radius: 1, grow: 1, maxRadius: 2 };
+// bossAt: 復元率 (%) at which 大墨 appears — also tunable from the #debug panel
+const TUNE = { discBias: 1, topUp: 0.24, rrScale: 0.62, bossAt: 75 };
+const BOSS_AT_DEFAULT = TUNE.bossAt;
+// Foot painting, available once 復元率 reaches `unlock` %: stand still for `delay` s and the gauge starts;
+// `charge` s later the ground under her feet takes colour (a disc of `radius` cells). Standing on repeats it,
+// `grow` cells wider each time up to `maxRadius`. Moving, knockback or a hit resets it. All tunable from #debug.
+const FOOT = { unlock: 60, delay: 1.0, charge: 3.0, radius: 1, grow: 1, maxRadius: 2 };
 const FOOT_DEFAULT = { ...FOOT };
 
 // 工房 — permanent, deliberately small boosts bought with 香料 earned at the end of every run.
@@ -1081,7 +1082,7 @@ function newRun(st) {
   let n = 0; for (let c = 0; c < st.N; c++) if (st.playable[c]) { unrest[n] = c; pos[c] = n; n++; }
   const ch = G.chars[G.char], bonus = runBonus(), hp = 5 + bonus.charm;
   run = {
-    stage: st, t: 0, time: 0, kills: 0, ch, geo: heroGeo(ch.H), bonus, footCells: 0,
+    stage: st, t: 0, time: 0, kills: 0, ch, geo: heroGeo(ch.H), bonus, footCells: 0, footOn: FOOT.unlock <= 0,
     p: { x: sx, y: sy + 3, hp, hpMax: hp, inv: 0, fireAt: -9, facing: -1, moving: false, kbx: 0, kby: 0, kbT: 0, healT: 0, inWater: false, still: 0, paintT: 0, paintN: 0, footR: 0 },
     up: { blades: 0, rate: 0, dmg: 0, speed: 0, echo: 0, heart: 0, pierce: 0 },
     enemies: [], blades: [], parts: [], rings: [], queue: [],
@@ -1188,7 +1189,7 @@ function paintFeet(rad) {
 function resetFoot(P) { P.still = 0; P.paintT = 0; P.paintN = 0; }
 function updateFoot(dt) {
   const P = run.p;
-  if (P.moving || P.kbT > 0) { resetFoot(P); return; }
+  if (!run.footOn || P.moving || P.kbT > 0) { resetFoot(P); return; }
   P.still += dt;
   if (P.still < FOOT.delay) return;
   const rad = footTarget();
@@ -1489,7 +1490,8 @@ function update(dt) {
   const p = pct();
   while (R.nextThr < THRESHOLDS.length && p >= THRESHOLDS[R.nextThr]) { R.nextThr++; R.pendingUp++; }
   if (R.pendingUp > 0) { openUpgrade(); return; }
-  if (!R.bossSpawned && p >= BOSS_AT) spawnBoss();
+  if (!R.footOn && p >= FOOT.unlock) { R.footOn = true; if (FOOT.unlock > 0) showBanner('足元に色がにじむ'); }
+  if (!R.bossSpawned && p >= TUNE.bossAt) spawnBoss();
 }
 function updateParticles(dt) {
   const R = run;
@@ -1503,7 +1505,7 @@ function updateParticles(dt) {
 function botInput() {
   const R = run, st = R.stage, P = R.p;
   // "stand" bot: stays put to let her feet colour the ground whenever no ink is close
-  if (G.botStand && footTarget() >= 0 && !R.enemies.some((e) => Math.hypot(e.x - P.x, e.y - (P.y - R.geo.mid)) < 64 + e.r)) return [0, 0];
+  if (G.botStand && R.footOn && footTarget() >= 0 && !R.enemies.some((e) => Math.hypot(e.x - P.x, e.y - (P.y - R.geo.mid)) < 64 + e.r)) return [0, 0];
   let tx = P.x, ty = P.y, bd = Infinity;
   for (let k = 0; k < R.unrestN; k += 1) {
     const c = R.unrest[k], x = ((c % st.CW) + 0.5) * CELL, y = (((c / st.CW) | 0) + 0.5) * CELL, d = (x - P.x) ** 2 + (y - P.y) ** 2;
@@ -1843,6 +1845,7 @@ function resume() {
 function startRun() {
   const st = G.stages[G.selected]; if (!st || !G.chars[G.char]) return;
   G.stage = st; newRun(st);
+  $('bossMark').style.left = `${clamp(TUNE.bossAt, 0, 100)}%`;
   for (const k in hudCache) hudCache[k] = k === 'clock' ? '' : (typeof hudCache[k] === 'number' ? -2 : null);
   $('upOv').classList.remove('on'); $('pauseOv').classList.remove('on'); $('banner').classList.remove('show');
   keys.clear(); joy.active = false;
@@ -2211,8 +2214,9 @@ const DEBUG_KEY = 'irogaeshi:debug';
 function loadDebugTune() {
   const s = store.get(DEBUG_KEY);
   if (s && s.foot) for (const k in FOOT) if (typeof s.foot[k] === 'number' && isFinite(s.foot[k]) && s.foot[k] >= 0) FOOT[k] = s.foot[k];
+  if (s && s.bossAt >= 1 && s.bossAt <= 100) TUNE.bossAt = Math.round(s.bossAt);
 }
-const saveDebugTune = () => store.set(DEBUG_KEY, { ...(store.get(DEBUG_KEY) || {}), foot: FOOT });
+const saveDebugTune = () => store.set(DEBUG_KEY, { ...(store.get(DEBUG_KEY) || {}), foot: FOOT, bossAt: TUNE.bossAt });
 function enableDebug() {
   if (G.debug) return;
   G.debug = true;
@@ -2220,7 +2224,7 @@ function enableDebug() {
 }
 function disableDebug() {
   store.set(DEBUG_KEY, { ...(store.get(DEBUG_KEY) || {}), on: false });
-  Object.assign(FOOT, FOOT_DEFAULT); G.god = false; G.noMeta = false; G.debug = false;
+  Object.assign(FOOT, FOOT_DEFAULT); TUNE.bossAt = BOSS_AT_DEFAULT; G.god = false; G.noMeta = false; G.debug = false;
   const box = document.querySelector('.dbg'); if (box) box.remove();
   delete window.__dbg;
 }
@@ -2236,6 +2240,7 @@ function autoplay(seconds, god) {
     if (G.state === 'play' || G.state === 'clearing') update(dt);
     const p = pct();
     for (const m of [15, 30, 45, 60, 75, 85]) if (p >= m && out.marks[m] == null) out.marks[m] = +run.t.toFixed(1);
+    if (run.bossSpawned && out.boss == null) out.boss = +run.t.toFixed(1);
   }
   G.bot = false; G.god = keepGod;
   Object.assign(out, { t: +run.t.toFixed(1), pct: +pct().toFixed(1), kills: run.kills, hp: run.p.hp, state: G.state, enemies: run.enemies.length, up: { ...run.up }, foot: +((run.footCells / run.stage.playableCount) * 100).toFixed(1) });
@@ -2251,6 +2256,7 @@ function forcePct(target) {
 
 function buildDebug() {
   const FIELDS = [
+    ['unlock', '使えるようになる復元率', '%', 1],
     ['delay', '止まってから溜め始めるまで', '秒', 0.1],
     ['charge', '溜め始めてから濡れるまで', '秒', 0.1],
     ['radius', '最初に塗る半径', 'マス', 1],
@@ -2261,6 +2267,8 @@ function buildDebug() {
   box.innerHTML = `<div class="dbg-p" id="dbgP" role="region" aria-label="デバッグ" hidden>
     <h3>足元塗り</h3>
     ${FIELDS.map(([k, l, u, s]) => `<label><span>${l}</span><input type="number" min="0" step="${s}" data-foot="${k}"><span>${u}</span></label>`).join('')}
+    <h3>進行</h3>
+    <label><span>ボスが出る復元率</span><input type="number" min="1" max="100" step="1" data-tune="bossAt"><span>%</span></label>
     <div class="row"><button type="button" data-act="footReset">初期値に戻す</button><button type="button" data-act="footCopy">値をコピー</button></div>
     <h3>テスト</h3>
     <label class="ck"><input type="checkbox" data-flag="god"><span>無敵</span></label>
@@ -2268,7 +2276,7 @@ function buildDebug() {
     <div class="row"><button type="button" data-act="pct">復元率 +10%</button><button type="button" data-act="boss">ボスを出す</button></div>
     <div class="row"><button type="button" data-act="koryo">${CURRENCY} +100</button><button type="button" data-act="metaReset">工房をリセット</button></div>
     <h3>ペース計測</h3>
-    <p class="out">選んでいるステージをボットが3回遊び、ボス出現（85%）までの時間を測る。工房の強化は切って測る。数秒かかる。</p>
+    <p class="out">選んでいるステージをボットが3回遊び、ボスが出るまでの時間を測る。工房の強化は切って測る。数秒かかる。</p>
     <div class="row"><button type="button" data-act="paceMove">歩き続ける操作</button><button type="button" data-act="paceStand">安全なら止まる操作</button></div>
     <p class="out" id="dbgOut" aria-live="polite"></p>
     <div class="row"><button type="button" data-act="off">デバッグをやめる</button></div>
@@ -2277,6 +2285,7 @@ function buildDebug() {
   const panel = $('dbgP'), out = $('dbgOut');
   const sync = () => {
     box.querySelectorAll('[data-foot]').forEach((el) => { el.value = String(FOOT[el.dataset.foot]); });
+    box.querySelectorAll('[data-tune]').forEach((el) => { el.value = String(TUNE[el.dataset.tune]); });
     box.querySelectorAll('[data-flag]').forEach((el) => { el.checked = !!G[el.dataset.flag]; });
   };
   sync();
@@ -2291,6 +2300,11 @@ function buildDebug() {
       if (!isFinite(v) || v < 0) return;
       FOOT[el.dataset.foot] = el.step === '1' ? Math.round(v) : v;
       saveDebugTune();
+    } else if (el.dataset.tune) {
+      const v = Math.round(parseFloat(el.value));
+      if (!isFinite(v) || v < 1 || v > 100) return;
+      TUNE[el.dataset.tune] = v; saveDebugTune();
+      if (run) $('bossMark').style.left = `${v}%`;
     } else if (el.dataset.flag) G[el.dataset.flag] = el.checked;
   });
   const pace = (stand) => {
@@ -2302,17 +2316,17 @@ function buildDebug() {
       G.noMeta = true; G.botStand = stand;
       try { for (let i = 0; i < 3; i++) { startRun(); rows.push(autoplay(600, true)); } }
       finally { G.noMeta = keepMeta; G.botStand = false; toTitle(); }
-      const boss = rows.map((r) => r.marks[85]).filter((v) => v != null);
+      const boss = rows.map((r) => r.boss).filter((v) => v != null);
       const avg = (a) => (a.length ? a.reduce((s, v) => s + v, 0) / a.length : NaN);
-      out.textContent = `${st.name}・${stand ? '安全なら止まる' : '歩き続ける'}操作\nボス出現まで 平均 ${Math.round(avg(boss))}秒（${rows.map((r) => (r.marks[85] != null ? Math.round(r.marks[85]) : '―')).join(' / ')}）\n足元塗りで戻した割合 平均 ${avg(rows.map((r) => r.foot)).toFixed(1)}%`;
+      out.textContent = `${st.name}・${stand ? '安全なら止まる' : '歩き続ける'}操作（ボス ${TUNE.bossAt}%・足元塗り ${FOOT.unlock}%〜）\nボス出現まで 平均 ${Math.round(avg(boss))}秒（${rows.map((r) => (r.boss != null ? Math.round(r.boss) : '―')).join(' / ')}）\n足元塗りで戻した割合 平均 ${avg(rows.map((r) => r.foot)).toFixed(1)}%`;
     }, 30);
   };
   box.addEventListener('click', (e) => {
     const act = e.target.dataset && e.target.dataset.act; if (!act) return;
     const inRun = G.screen === 'game' && run && (G.state === 'play' || G.state === 'paused');
-    if (act === 'footReset') { Object.assign(FOOT, FOOT_DEFAULT); saveDebugTune(); sync(); out.textContent = '初期値に戻した。'; }
+    if (act === 'footReset') { Object.assign(FOOT, FOOT_DEFAULT); TUNE.bossAt = BOSS_AT_DEFAULT; saveDebugTune(); sync(); out.textContent = '初期値に戻した。'; }
     else if (act === 'footCopy') {
-      const text = `const FOOT = ${JSON.stringify(FOOT).replace(/"(\w+)":/g, '$1: ').replace(/,/g, ', ')};`;
+      const text = `const FOOT = ${JSON.stringify(FOOT).replace(/"(\w+)":/g, '$1: ').replace(/,/g, ', ')};\nbossAt: ${TUNE.bossAt}`;
       out.textContent = text;
       try { navigator.clipboard.writeText(text).then(() => { out.textContent = `${text}\n（コピーした）`; }, () => {}); } catch (err) { /* shown above */ }
     }
