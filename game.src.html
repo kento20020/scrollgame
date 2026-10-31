@@ -391,7 +391,6 @@ const STAGES = [
 
 // Sound hooks — window.SFX comes from the inlined sfx.js; a no-op if it is missing.
 const sfx = (n, o) => { try { window.SFX && window.SFX.play(n, o); } catch (e) { /* ignore */ } };
-const DEBUG = location.hash === '#debug';
 
 const $ = (id) => document.getElementById(id);
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
@@ -2169,7 +2168,6 @@ function frame(now) {
 
 function boot() {
   loadMeta(); updateWallet();
-  if (DEBUG) loadDebugTune();
   prepSmall(); prepBlobs(); prepBlades();
   buildCards(); buildCharCards();
   const ready = (def, src, w, h) => {
@@ -2192,12 +2190,20 @@ function boot() {
       if (G.char === def.id) { renderPortrait(); renderPreview(); }
     }).catch(() => { charCardFor(def.id).querySelector('.ds').textContent = '画像を読み込めなかった'; });
   }
-  if (DEBUG) buildDebug();
+  if (location.hash === '#debug' || (store.get(DEBUG_KEY) || {}).on) enableDebug();
+  // five quick taps on the logo also open it — for hosts whose URL can't carry #debug
+  let taps = [];
+  document.querySelector('.logo').addEventListener('click', () => {
+    const now = performance.now(); taps = taps.filter((t) => now - t < 2000); taps.push(now);
+    if (taps.length < 5 || G.debug) return;
+    store.set(DEBUG_KEY, { ...(store.get(DEBUG_KEY) || {}), on: true });
+    enableDebug(); $('dbgTg').click();
+  });
   requestAnimationFrame(frame);
 }
 
 /* ════════════════════════════════════════════════════════════
-   10. Debug — only with #debug in the URL: an on-screen panel
+   10. Debug — with #debug in the URL or five taps on the logo: a panel
    (foot-painting timings, test switches, pacing runs) and the
    window.__dbg hook used by automated tests
    ════════════════════════════════════════════════════════════ */
@@ -2206,7 +2212,18 @@ function loadDebugTune() {
   const s = store.get(DEBUG_KEY);
   if (s && s.foot) for (const k in FOOT) if (typeof s.foot[k] === 'number' && isFinite(s.foot[k]) && s.foot[k] >= 0) FOOT[k] = s.foot[k];
 }
-const saveDebugTune = () => store.set(DEBUG_KEY, { foot: FOOT });
+const saveDebugTune = () => store.set(DEBUG_KEY, { ...(store.get(DEBUG_KEY) || {}), foot: FOOT });
+function enableDebug() {
+  if (G.debug) return;
+  G.debug = true;
+  loadDebugTune(); buildDebug(); exposeDebug();
+}
+function disableDebug() {
+  store.set(DEBUG_KEY, { ...(store.get(DEBUG_KEY) || {}), on: false });
+  Object.assign(FOOT, FOOT_DEFAULT); G.god = false; G.noMeta = false; G.debug = false;
+  const box = document.querySelector('.dbg'); if (box) box.remove();
+  delete window.__dbg;
+}
 
 // synchronous autopilot for pacing checks; never touches records or 香料
 function autoplay(seconds, god) {
@@ -2254,6 +2271,7 @@ function buildDebug() {
     <p class="out">選んでいるステージをボットが3回遊び、ボス出現（85%）までの時間を測る。工房の強化は切って測る。数秒かかる。</p>
     <div class="row"><button type="button" data-act="paceMove">歩き続ける操作</button><button type="button" data-act="paceStand">安全なら止まる操作</button></div>
     <p class="out" id="dbgOut" aria-live="polite"></p>
+    <div class="row"><button type="button" data-act="off">デバッグをやめる</button></div>
   </div><button type="button" class="dbg-tg" id="dbgTg" aria-expanded="false" aria-controls="dbgP">DEBUG</button>`;
   document.body.appendChild(box);
   const panel = $('dbgP'), out = $('dbgOut');
@@ -2304,10 +2322,11 @@ function buildDebug() {
     else if (act === 'metaReset') { META.koryo = 0; for (const it of SHOP) META.lv[it.id] = 0; saveMeta(); updateWallet(); out.textContent = '工房をリセットした。'; }
     else if (act === 'paceMove') pace(false);
     else if (act === 'paceStand') pace(true);
+    else if (act === 'off') disableDebug();
   });
 }
 
-if (DEBUG) window.__dbg = {
+function exposeDebug() { window.__dbg = {
   G, get run() { return run; }, pct, TUNE, ENEMY, FOOT, META, SHOP, stats: (k) => G.stages[k] && G.stages[k].stats,
   start(key) { if (key) selectStage(key); startRun(); },
   forcePct,
@@ -2320,7 +2339,7 @@ if (DEBUG) window.__dbg = {
   get heroFrame() { return heroFrame; },
   stageImages(k) { const st = G.stages[k]; return { color: st.colorCanvas.toDataURL(), gray: st.grayCanvas.toDataURL(), terrain: terrainCanvas(st).toDataURL() }; },
   buildFromCanvas(w, h, painter) { const c = makeCanvas(w, h); painter(c.getContext('2d'), w, h); return buildStage(c, w, h, { key: 'test', name: 'test' }); },
-};
+}; }
 
 boot();
 })();
