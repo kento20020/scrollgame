@@ -2688,8 +2688,19 @@ function workImage(w) {
   [...`${w.src.name}より`].forEach((ch, i) => g.fillText(ch, cv.width - side / 2 - 4, cv.height - pad - 10 - (`${w.src.name}より`.length - 1 - i) * 13));
   return cv;
 }
+// Inside the claude.ai viewer a page may only offer files through its `downloads` capability (the viewer
+// confirms each save); opened as a plain file, an ordinary download link does it.
+const framedView = !!(window.claude && typeof window.claude.use === 'function');
+if (framedView) window.claude.use('downloads').then((d) => { G.dl = d; }, () => { G.dl = null; });
+const canSaveWork = () => !framedView || !!G.dl;
 function downloadWork(w) {
-  try { const a = document.createElement('a'); a.download = `${workTitle(w).replace('　', '_')}.png`; a.href = workImage(w).toDataURL('image/png'); document.body.appendChild(a); a.click(); a.remove(); } catch (e) { /* downloads unavailable */ }
+  const filename = `${workTitle(w).replace('　', '_')}.png`, cv = workImage(w);
+  if (framedView) {
+    if (!G.dl) return;
+    cv.toBlob((blob) => { if (blob) G.dl.save({ filename, data: blob }).catch(() => { /* declined or unavailable */ }); }, 'image/png');
+    return;
+  }
+  try { const a = document.createElement('a'); a.download = filename; a.href = cv.toDataURL('image/png'); document.body.appendChild(a); a.click(); a.remove(); } catch (e) { /* downloads unavailable */ }
 }
 
 /* ════════════════════════════════════════════════════════════
@@ -3797,6 +3808,7 @@ function showWork(w) {
   G.lastWorkStage = st; thumbCache.set(w.id, st.cover);
   cv.width = st.cover.width; cv.height = st.cover.height; cv.getContext('2d').drawImage(st.cover, 0, 0);
   $('rWorkTitle').textContent = workTitle(w);
+  $('workSave').hidden = !canSaveWork();
   const oc = { clear: '大墨を祓った', retreat: '撤収した', death: '倒れた' }[w.src.outcome] || '終えた';
   $('rWorkDesc').textContent = `${fmtTime(w.src.t)}で${oc}一戦から。歩いた道・囲んだ輪・祓った墨が、そのまま次の地形になる。`;
   $('rWorkSeries').innerHTML = `「<span></span>」の連作 <b>${seriesMarks(w.chain)}</b>${w.chain === SERIES_LEN ? '　五枚そろった' : w.chain > SERIES_LEN ? `　其の${kanNum(w.chain)}` : ''}`;
