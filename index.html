@@ -1664,7 +1664,9 @@ const TUNE = { discBias: 1, topUp: 0.24, rrScale: 0.62, bossAt: 75, frontier: 1 
 // every gray pocket the line cut off (all but the biggest side), purifying the ink caught inside. Small ink
 // cannot cross the line; big ink and the boss break it, and so does a hit.
 // maxLen: cells one stroke may run (筆の墨); maxArea: biggest pocket one stroke fills; speed: walk speed while drawing.
-const BRUSH = { maxLen: 40, maxArea: 260, speed: 0.9, minLen: 3, unlock: 0 };
+// minOwn: share of a pocket's border that must be her line or her colour (walls and the map edge don't fence it in);
+// springHit: share of a 墨溜まり's health one stroke around it takes (the ground right by a living one never fills).
+const BRUSH = { maxLen: 40, maxArea: 260, speed: 0.9, minLen: 3, unlock: 0, minOwn: 0.85, springHit: 0.34 };
 // 墨溜まり: ink springs in the darkest (lowest) ground. Each sends out ink blots, eats colour back within `reach`
 // cells (one cell every `eatEvery` s) and has `hp`: blades wear it down, a brush stroke around it seals it at once.
 const SPRING = { count: 3, hp: 40, reach: 8, eatEvery: 0.7, spawnShare: 0.35 };
@@ -1728,7 +1730,7 @@ function newRun(st) {
     stage: st, t: 0, time: 0, kills: 0, ch, geo: heroGeo(ch.H), bonus, tplId, tpl, act: 0, landmarks: [], tide: null,
     p: { x: sx, y: sy + 3, hp, hpMax: hp, inv: 0, fireAt: -9, facing: -1, moving: false, kbx: 0, kby: 0, kbT: 0, healT: 0, inWater: false },
     trail: { on: false, last: -1, prev: -1, cells: [], mark: new Uint8Array(st.N), pts: [] }, brushCells: 0, strokes: 0, caught: 0, cuts: 0, dries: 0, botPlan: null,
-    springs: placeSprings(st, sx, sy, nSprings), sealed: 0, eroded: 0,
+    springs: placeSprings(st, sx, sy, nSprings), sealed: 0, sealedBrush: 0, sealTimes: [], eroded: 0,
     hue: new Int32Array(FAMS.length), hueLv: new Int8Array(FAMS.length), vineT: 4, shield: false, shieldT: 0,
     up: { blades: 0, rate: 0, dmg: 0, speed: 0, echo: 0, heart: 0, pierce: 0 },
     enemies: [], blades: [], parts: [], rings: [], queue: [],
@@ -2117,15 +2119,15 @@ function updateSprings(dt) {
     R.parts.push({ x: ((best % st.CW) + 0.5) * CELL, y: (((best / st.CW) | 0) + 0.5) * CELL, vx: 0, vy: -10, life: 0.5, max: 0.5, kind: 'ink', s: 2 });
   }
 }
-function hurtSpring(s, dmg) {
-  if (s.dead || s.dormant) return; // a sleeping spring can only be sealed by a brush stroke
+function hurtSpring(s, dmg, brush) {
+  if (s.dead || (s.dormant && !brush)) return; // blades pass over a sleeping spring; a brush stroke still wears it down
   s.hp -= dmg; s.flash = 0.1;
-  if (s.hp <= 0) sealSpring(s); else sfx('hit', { vol: 0.6 });
+  if (s.hp <= 0) sealSpring(s, brush); else sfx('hit', { vol: 0.6 });
 }
-function sealSpring(s) {
+function sealSpring(s, brush) {
   const R = run;
   if (s.dead) return;
-  s.dead = true; R.sealed++;
+  s.dead = true; R.sealed++; R.sealTimes.push(+R.t.toFixed(1)); if (brush) R.sealedBrush++;
   restoreAt(s.x, s.y, 4);
   for (const e of R.enemies) if (!e.dead && !e.boss && Math.hypot(e.x - s.x, e.y - s.y) < 48) purify(e);
   burst(s.x, s.y, 16, 3);
@@ -2224,31 +2226,55 @@ function closeTrail() {
   }
   let biggest = -1;
   groups.forEach((g, i) => { if (biggest < 0 || g.length > groups[biggest].length) biggest = i; });
+  // how much of a pocket's border is her own line or colour (the rest is wall or the edge of the picture)
+  const ownShare = (g, id) => {
+    let own = 0, wall = 0;
+    for (const c of g) {
+      const x = c % CW;
+      for (const m of [x > 0 ? c - 1 : -2, x < CW - 1 ? c + 1 : -2, c - CW, c + CW]) {
+        if (m < 0 || m >= N) { wall++; continue; }
+        if (comp[m] === id) continue;
+        if (T.mark[m] || ownCell(m)) own++; else wall++;
+      }
+    }
+    return own / Math.max(1, own + wall);
+  };
   const fill = T.cells.slice();
-  let tooBig = false;
+  let tooBig = false, leaky = false;
   groups.forEach((g, i) => {
     if (i === biggest) return;
     if (g.length > BRUSH.maxArea) { tooBig = true; return; }
+    if (ownShare(g, i) < BRUSH.minOwn) { leaky = true; return; }
     for (const c of g) fill.push(c);
   });
+  // the ground right by a living 墨溜まり stays gray
+  const inkRing = new Uint8Array(N);
+  for (const q of R.springs) {
+    if (q.dead) continue;
+    for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
+      const x = q.cx + dx, y = q.cy + dy;
+      if (dx * dx + dy * dy <= 5 && x >= 0 && y >= 0 && x < CW && y < st.CH) inkRing[y * CW + x] = 1;
+    }
+  }
   const mark = new Uint8Array(N);
   let fresh = 0, sx = 0, sy = 0;
   fill.forEach((c, i) => {
     mark[c] = 1; sx += c % CW; sy += (c / CW) | 0;
-    if (ownCell(c)) return;
+    if (ownCell(c) || inkRing[c]) return;
     if (st.playable[c]) fresh++;
     queueRestore(c, 0.04 + (i / fill.length) * 0.45);
   });
   R.brushCells += fresh; R.strokes++;
-  // ink caught inside is purified; a 墨溜まり inside (or under the line) is sealed
+  // ink caught inside is purified; a 墨溜まり inside (or under the line) is worn down, not sealed outright
   let caught = 0;
   for (const e of R.enemies) if (!e.dead && !e.boss && mark[cellIndex(e.x, e.y)]) { purify(e); caught++; }
   R.caught += caught;
-  for (const s of R.springs) if (!s.dead && mark[s.c]) sealSpring(s);
+  for (const s of R.springs) if (!s.dead && mark[s.c]) { hurtSpring(s, Math.max(1, Math.ceil(s.maxHp * BRUSH.springHit)), true); if (!s.dead) say('墨溜まりを削った'); }
   const cx = (sx / fill.length + 0.5) * CELL, cy = (sy / fill.length + 0.5) * CELL;
   if (!reduced) R.rings.push({ x: cx, y: cy, r: Math.sqrt(fill.length) * CELL * 0.7, t: 0, dur: 0.6, big: false, wet: true });
   if (fresh >= 10) R.parts.push({ x: cx, y: cy - 6, vx: 0, vy: -14, life: 1.2, max: 1.2, kind: 'txt', s: 0, text: caught ? `${fresh}マス・墨×${caught}` : `${fresh}マス` });
   if (tooBig) say('広すぎて囲めない');
+  else if (leaky) say('囲いが開いている');
   sfx('restore'); if (caught) sfx('kill');
   clearTrail(T);
 }
@@ -2401,15 +2427,20 @@ function fire() {
   for (const e of R.enemies) { if (e.dead) continue; const d = (e.x - ox) ** 2 + (e.y - oy) ** 2; if (d < bd) { bd = d; best = e; } }
   // no ink close by: aim at a 墨溜まり in reach; standing right by one, every other volley goes to it anyway
   const nearSpring = (r) => { let s0 = null, sd = r * r; for (const q of R.springs) { if (q.dead || q.dormant) continue; const d = (q.x - ox) ** 2 + (q.y - oy) ** 2; if (d < sd) { sd = d; s0 = q; } } return s0; };
-  const close = nearSpring(70);
-  if (close && (R.volley = (R.volley || 0) + 1) % 2 === 0) best = close;
+  const close = nearSpring(70), boss = R.boss && !R.boss.dead && (R.boss.x - ox) ** 2 + (R.boss.y - oy) ** 2 < 160 * 160 ? R.boss : null;
+  R.volley = (R.volley || 0) + 1;
+  // the boss within reach takes every other volley, so a crowd of small ink can't hide it
+  let aimed = false;
+  if (boss && R.volley % 2 === 0) { best = boss; aimed = true; }
+  else if (close && R.volley % 2 === 0) { best = close; aimed = true; }
   else if (bd > 110 * 110) { const q = nearSpring(140); if (q) best = q; }
   const ang = best ? Math.atan2(best.y - oy, best.x - ox) : (P.facing > 0 ? 0 : Math.PI);
   P.fireAt = R.time; sfx('fan');
   const n = 3 + R.up.blades, spread = ((36 + (n - 3) * 10) * Math.PI) / 180;
   for (let i = 0; i < n; i++) {
     const a = ang - spread / 2 + (spread * i) / (n - 1);
-    R.blades.push({ x: ox, y: oy, vx: Math.cos(a) * 170, vy: Math.sin(a) * 170, a, life: 0.9, dmg: 1 + R.up.dmg, pierce: 1 + R.up.pierce, hit: [], tr: [] });
+    // a volley aimed at the boss or a 墨溜まり flies through the small ink in between
+    R.blades.push({ x: ox, y: oy, vx: Math.cos(a) * 170, vy: Math.sin(a) * 170, a, life: 0.9, dmg: 1 + R.up.dmg, pierce: 1 + R.up.pierce, hit: [], tr: [], seek: aimed });
   }
 }
 
@@ -2563,7 +2594,8 @@ function update(dt) {
       e.sumT -= dt;
       if (e.sumT <= 0 && e.spawnT <= 0) {
         e.sumT = 4;
-        for (let i = 0; i < 3; i++) { const a = (i / 3) * Math.PI * 2 + Math.random(); if (E.length < 160) addEnemy('blot', e.x + Math.cos(a) * 24, e.y + Math.sin(a) * 24); }
+        // the boss calls ink only while the field is not already crowded
+        for (let i = 0; i < 3; i++) { const a = (i / 3) * Math.PI * 2 + Math.random(); if (E.length < 30) addEnemy('blot', e.x + Math.cos(a) * 24, e.y + Math.sin(a) * 24); }
       }
     }
     if (P.inv <= 0 && e.spawnT <= 0 && capsuleDist(e.x, e.y, P) < e.r + 4) { hitPlayer(e); if (G.state !== 'play') return; }
@@ -2590,7 +2622,7 @@ function update(dt) {
     b.x += b.vx * dt; b.y += b.vy * dt; b.life -= dt;
     if (b.life <= 0) continue;
     for (const e of E) {
-      if (e.dead || e.spawnT > 0.25) continue;
+      if (e.dead || e.spawnT > 0.25 || (b.seek && !e.boss)) continue;
       const rr = e.r + 4, dx = e.x - b.x; if (dx > rr || dx < -rr) continue;
       const dy = e.y - b.y; if (dy > rr || dy < -rr || dx * dx + dy * dy > rr * rr) continue;
       if (b.hit.includes(e.id)) continue;
@@ -2634,6 +2666,11 @@ function updateParticles(dt) {
 function botInput() {
   const R = run, st = R.stage, P = R.p;
   let tx = P.x, ty = P.y, bd = Infinity, pull = 1;
+  // with the boss out, close in to fan range (and keep a little distance)
+  if (R.boss && !R.boss.dead) {
+    const d = Math.hypot(R.boss.x - P.x, R.boss.y - (P.y - R.geo.mid));
+    if (d > 110) { tx = R.boss.x; ty = R.boss.y; bd = 0; }
+  }
   // "loop" bot: from its colour it walks ~8 cells out into the gray, turns, and comes home to close the line
   // (as a person drawing small loops would); with no plan left it walks up to a nearby 墨溜まり
   const T = R.trail, here = cellIndex(P.x, P.y);
@@ -3594,7 +3631,7 @@ function autoplay(seconds, god) {
   const R = run, pc = (n) => +((n / R.stage.playableCount) * 100).toFixed(1);
   Object.assign(out, {
     t: +R.t.toFixed(1), pct: +pct().toFixed(1), kills: R.kills, hp: R.p.hp, state: G.state, enemies: R.enemies.length, up: { ...R.up },
-    brush: pc(R.brushCells), strokes: R.strokes, caught: R.caught, cuts: R.cuts, dries: R.dries, eroded: pc(R.eroded), sealed: R.sealed, springs: R.springs.length, hueLv: Array.from(R.hueLv),
+    brush: pc(R.brushCells), strokes: R.strokes, caught: R.caught, cuts: R.cuts, dries: R.dries, eroded: pc(R.eroded), sealed: R.sealed, sealedBrush: R.sealedBrush, firstSeal: R.sealTimes[0] ?? null, springs: R.springs.length, hueLv: Array.from(R.hueLv),
   });
   return out;
 }
@@ -3614,6 +3651,8 @@ function buildDebug() {
     ['BRUSH', 'maxArea', '一度に囲める広さの上限', 'マス', 10],
     ['BRUSH', 'speed', '線を引く間の歩く速さ', '倍', 0.05],
     ['BRUSH', 'unlock', '使えるようになる復元率', '%', 1],
+    ['BRUSH', 'minOwn', '囲いのうち線と色で作る割合', '以上', 0.05],
+    ['BRUSH', 'springHit', '囲んだ墨溜まりを削る割合', '', 0.05],
     ['墨溜まり（数と体力は次のプレイから）'],
     ['SPRING', 'count', '数', '個', 1],
     ['SPRING', 'hp', '体力', '', 1],
