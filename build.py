@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 """Inline stages, characters and sound effects into index.html (one self-contained file).
 
-Stages      every image in stages/ (except preview_*) becomes a stage. stages/stages.json sets the
-            order, names and descriptions; images not listed there are added after it, named by file.
+Stages      every image in stages/ (except preview_* and *_mask) becomes a stage. stages/stages.json sets
+            the order, names, descriptions and the default 型 ("template": full / meisho / fuuin / shio);
+            images not listed there are added after it, named by file. <stem>_mask.png (or "mask" in
+            stages.json) is the gimmick mask: red 墨溜まり, yellow 名所, blue low ground, white high
+            ground, green start (tools/make_mask.py writes a starter one).
 Characters  every folder in characters/ (and every lone image directly in characters/) becomes a
             playable character. characters/<id>/character.json is optional — without it the folder's
             sprite.* (or its first image) is used as a still, and the game animates it by itself.
@@ -19,6 +22,7 @@ CHARACTERS = ROOT / "characters"
 
 MIME = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".gif": "image/gif", ".webp": "image/webp"}
 BIG = 3 * 1024 * 1024  # warn above this: every byte is inlined into index.html
+TEMPLATES = ("full", "meisho", "fuuin", "shio")  # 型 ids the game knows
 
 # Text files inserted verbatim (inline <script> bodies).
 TEXTS = {
@@ -28,6 +32,10 @@ TEXTS = {
 
 def is_image(p: pathlib.Path) -> bool:
     return p.is_file() and p.suffix.lower() in MIME
+
+
+def is_stage_image(p: pathlib.Path) -> bool:
+    return is_image(p) and not p.name.startswith("preview_") and not p.stem.endswith("_mask")
 
 
 def data_uri(path: pathlib.Path) -> str:
@@ -51,12 +59,20 @@ def stage_defs() -> list:
     manifest = read_json(STAGES / "stages.json", [])
     listed = {e["file"] for e in manifest}
     for p in sorted(STAGES.iterdir()):
-        if is_image(p) and not p.name.startswith("preview_") and p.name not in listed:
+        if is_stage_image(p) and p.name not in listed:
             manifest.append({"id": p.stem, "name": p.stem, "file": p.name})
     out = []
     for e in manifest:
-        out.append({"id": e.get("id") or pathlib.Path(e["file"]).stem, "name": e.get("name") or e["file"],
-                    "desc": e.get("desc", ""), "src": data_uri(STAGES / e["file"])})
+        d = {"id": e.get("id") or pathlib.Path(e["file"]).stem, "name": e.get("name") or e["file"],
+             "desc": e.get("desc", ""), "src": data_uri(STAGES / e["file"])}
+        if e.get("template"):
+            if e["template"] not in TEMPLATES:
+                raise SystemExit(f"stages.json: unknown template {e['template']!r} (use one of {', '.join(TEMPLATES)})")
+            d["template"] = e["template"]
+        mask = STAGES / e["mask"] if e.get("mask") else STAGES / f"{pathlib.Path(e['file']).stem}_mask.png"
+        if e.get("mask") or mask.is_file():
+            d["mask"] = data_uri(mask)
+        out.append(d)
     return out
 
 

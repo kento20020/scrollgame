@@ -121,6 +121,15 @@ button{font:inherit;color:inherit}
 .best{font-size:12px;margin:8px 0 10px;color:var(--muted);line-height:1.5}
 .best b{color:var(--paper);font-family:var(--font-dot);font-weight:400}
 .pv-msg{font-size:12px;color:var(--peony);margin:6px 0 0}
+.tpls{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 6px}
+.tplb{border:1px solid var(--line);background:var(--ink);border-radius:3px;padding:5px 9px;font-size:12px;line-height:1.2;cursor:pointer;display:inline-flex;align-items:center;gap:5px;min-height:32px}
+.tplb:hover{border-color:var(--muted)}
+.tplb[aria-pressed="true"]{border-color:var(--gold);box-shadow:inset 0 0 0 1px var(--gold)}
+.tplb small{font-size:10px;color:var(--gold);border:1px solid var(--gold);border-radius:2px;padding:0 3px;line-height:1.4}
+.tpl-desc{font-size:12px;color:var(--muted);margin:0 0 8px;line-height:1.5}
+.goal{display:inline-flex;align-items:center;gap:6px;font-size:12px;white-space:nowrap}
+.goal .act{font-family:var(--font-title);font-size:13px;color:var(--gold);border:1px solid var(--line);border-radius:2px;padding:1px 5px;line-height:1.2}
+.pwl{display:flex;gap:6px;flex-wrap:wrap}
 .pv-pw{font-size:12px;margin:-4px 0 8px;color:var(--muted);line-height:1.6}
 .pv-pw:empty{display:none}
 .pv-pw span{white-space:nowrap}
@@ -305,6 +314,8 @@ button{font:inherit;color:inherit}
         </div>
         <div class="pv-info">
           <h3 class="pv-name" id="pvName">月夜の水庭</h3>
+          <div class="tpls" id="tpls" role="group" aria-label="型"></div>
+          <p class="tpl-desc" id="tplDesc"></p>
           <ul class="legend" id="legend"></ul>
           <p class="pv-pw" id="pvPw"></p>
           <p class="best" id="pvBest">最高記録 <b>―</b></p>
@@ -335,7 +346,7 @@ button{font:inherit;color:inherit}
           </div>
           <span class="pct" id="pct">0%</span>
         </div>
-        <div class="hud-row pw" id="hudPw" hidden></div>
+        <div class="hud-row pw" id="hudInfo"><span class="goal" id="goal"><b class="act" id="actName">序</b><span id="goalText"></span></span><span class="pwl" id="hudPw"></span></div>
         <div class="hud-row sub" id="hudSub" hidden>
           <span class="spr" id="sprInfo" hidden></span>
           <div class="bossbar" id="bossbar" hidden><span class="lbl">大墨</span><div class="bar"><div class="fill" id="bossfill"></div></div></div>
@@ -411,8 +422,8 @@ const CHARACTER_DEFS = /*{{CHARACTER_DEFS}}*/[];
 // Stage list — data-driven (title cards are generated from it).
 // kind 'procedural' → src is a function returning a canvas; kind 'image' → src is a URL / data URI.
 const STAGES = [
-  { id: 'moon', name: '月夜の水庭', desc: '池と朱の橋の庭', kind: 'procedural', src: () => drawMoonGarden() },
-  ...STAGE_DEFS.map((d) => ({ id: d.id, name: d.name, desc: d.desc, kind: 'image', src: d.src })),
+  { id: 'moon', name: '月夜の水庭', desc: '池と朱の橋の庭', kind: 'procedural', src: () => drawMoonGarden(), template: 'full' },
+  ...STAGE_DEFS.map((d) => ({ id: d.id, name: d.name, desc: d.desc, kind: 'image', src: d.src, template: d.template, mask: d.mask })),
 ];
 
 // Sound hooks — window.SFX comes from the inlined sfx.js; a no-op if it is missing.
@@ -494,7 +505,7 @@ function rasterizeSource(src, sw, sh) {
   g.fillStyle = C.paper; g.fillRect(0, 0, AW, AH); // transparency → rice paper
   g.imageSmoothingEnabled = curW > AW || curH > AH; g.imageSmoothingQuality = 'high';
   g.drawImage(cur, cx, cy, curW, curH, 0, 0, AW, AH);
-  return { AW, AH, data: g.getImageData(0, 0, AW, AH).data };
+  return { AW, AH, data: g.getImageData(0, 0, AW, AH).data, crop: [sx / sw, sy / sh, cw / sw, ch / sh] };
 }
 
 // median cut + a few k-means passes, no dithering
@@ -592,7 +603,7 @@ function classify(h, l, c, wallT) {
 }
 
 function buildStage(src, sw, sh, meta) {
-  const { AW, AH, data } = rasterizeSource(src, sw, sh);
+  const { AW, AH, data, crop } = rasterizeSource(src, sw, sh);
   const n = AW * AH;
   const q = quantize(data, n, 24);
   const color = new Uint8ClampedArray(n * 4), gray = new Uint8ClampedArray(n * 4);
@@ -640,8 +651,11 @@ function buildStage(src, sw, sh, meta) {
     fam[c] = famOf(hsl[c * 4], hsl[c * 4 + 2], hsl[c * 4 + 3]); height[c] = hsl[c * 4 + 2];
     if (playable[c] && fam[c] !== NOFAM) famCount[fam[c]]++;
   }
-  // spawn: playable floor cell nearest the centre, preferring ones with open neighbours
-  const spawnCell = (() => {
+  // a gimmick mask places 墨溜まり / 名所 by hand and can mark ground as low or high
+  const mask = meta.mask ? readMask(meta.mask, crop, CW, CH, playable) : null;
+  if (mask) { for (const c of mask.low) height[c] = 0; for (const c of mask.high) height[c] = 1; }
+  // spawn: the mask's start, else the playable floor cell nearest the centre, preferring ones with open neighbours
+  const spawnCell = mask && mask.start >= 0 ? mask.start : (() => {
     let best = -1, bd = Infinity, fb = -1, fbd = Infinity;
     const mx = (CW - 1) / 2, my = (CH - 1) / 2;
     for (let c = 0; c < N; c++) {
@@ -667,6 +681,63 @@ function buildStage(src, sw, sh, meta) {
   return {
     key: meta.key, name: meta.name, AW, AH, CW, CH, N, W: AW * ART_WORLD, H: AH * ART_WORLD,
     color, gray, colorCanvas, grayCanvas, terrain, playable, playableCount: count, spawnCell, stats, wallT, fam, height, famCount,
+    mask, tplDefault: meta.template || null,
+  };
+}
+
+// Gimmick mask: a picture of the same shape as the stage, painted in pure colours — red 墨溜まり (one per
+// blob), yellow 名所 (each blob one landmark), blue low ground (floods first), white high ground, green start.
+// Read at full resolution so a few painted pixels are enough to mark a cell.
+const MASK_KINDS = [null, [255, 0, 0], [255, 255, 0], [0, 0, 255], [255, 255, 255], [0, 255, 0]];
+function readMask(img, crop, CW, CH, playable) {
+  const iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height;
+  const cw = crop[2] * iw, ch = crop[3] * ih, f = Math.min(1, 512 / Math.max(cw, ch));
+  const MW = Math.max(1, Math.round(cw * f)), MH = Math.max(1, Math.round(ch * f));
+  const cv2 = makeCanvas(MW, MH), g = cv2.getContext('2d', { willReadFrequently: true });
+  g.imageSmoothingEnabled = false;
+  g.drawImage(img, crop[0] * iw, crop[1] * ih, cw, ch, 0, 0, MW, MH);
+  const d = g.getImageData(0, 0, MW, MH).data, N = CW * CH, votes = new Uint16Array(N * 6), kind = new Uint8Array(N);
+  for (let y = 0; y < MH; y++) for (let x = 0; x < MW; x++) {
+    const i = (y * MW + x) * 4;
+    if (d[i + 3] < 128) continue;
+    for (let k = 1; k < 6; k++) {
+      const t = MASK_KINDS[k];
+      if (Math.abs(d[i] - t[0]) + Math.abs(d[i + 1] - t[1]) + Math.abs(d[i + 2] - t[2]) < 150) { votes[(Math.floor((y * CH) / MH) * CW + Math.floor((x * CW) / MW)) * 6 + k]++; break; }
+    }
+  }
+  for (let c = 0; c < N; c++) { let best = 0; for (let k = 1; k < 6; k++) if (votes[c * 6 + k] > (best ? votes[c * 6 + best] : 0)) best = k; kind[c] = best; }
+  const blobs = (k) => {
+    const seen = new Uint8Array(N), out = [];
+    for (let s = 0; s < N; s++) {
+      if (seen[s] || kind[s] !== k) continue;
+      const cells = [s]; seen[s] = 1;
+      for (let h = 0; h < cells.length; h++) {
+        const c = cells[h], x = c % CW;
+        for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+          const m = c + dy * CW + dx;
+          if ((!dx && !dy) || x + dx < 0 || x + dx >= CW || m < 0 || m >= N || seen[m] || kind[m] !== k) continue;
+          seen[m] = 1; cells.push(m);
+        }
+      }
+      out.push(cells);
+    }
+    return out;
+  };
+  // the playable cell nearest a blob's centre
+  const centre = (cells) => {
+    let sx = 0, sy = 0; for (const c of cells) { sx += c % CW; sy += (c / CW) | 0; }
+    sx /= cells.length; sy /= cells.length;
+    let best = -1, bd = Infinity;
+    for (let c = 0; c < N; c++) { if (!playable[c]) continue; const dd = (c % CW - sx) ** 2 + (((c / CW) | 0) - sy) ** 2; if (dd < bd) { bd = dd; best = c; } }
+    return best;
+  };
+  const start = blobs(5);
+  return {
+    springs: blobs(1).map(centre).filter((c) => c >= 0),
+    landmarks: blobs(2).map((b) => b.filter((c) => playable[c])).filter((b) => b.length >= 4),
+    low: kind.reduce((a, k, c) => (k === 3 && a.push(c), a), []),
+    high: kind.reduce((a, k, c) => (k === 4 && a.push(c), a), []),
+    start: start.length ? centre(start[0]) : -1,
   };
 }
 
@@ -1089,9 +1160,6 @@ const SPRING = { count: 3, hp: 40, reach: 8, eatEvery: 0.7, spawnShare: 0.35 };
 // 色の力: restored cells of a family → power level; Lv1–5 at these counts × scale
 const HUE = { scale: 1 };
 const HUE_LV = [30, 90, 200, 380, 640];
-// every number the #debug panel can change, with its starting value
-const CFG = { BRUSH, SPRING, HUE, TUNE };
-const CFG_DEFAULT = { BRUSH: { ...BRUSH }, SPRING: { ...SPRING }, HUE: { ...HUE }, TUNE: { bossAt: TUNE.bossAt, frontier: TUNE.frontier } };
 
 // 工房 — permanent, deliberately small boosts bought with 香料 earned at the end of every run.
 // val(lv) is what the run uses (see newRun); stat + fmt(lv) is what the card shows.
@@ -1130,7 +1198,7 @@ const UPGRADES = [
 const PLAYER_R = 4;          // collision radius at the feet (fits a 1-cell corridor)
 const BASE_SPEED = 62;
 
-const G = { screen: 'title', state: 'title', stage: null, stages: {}, selected: 'moon', chars: {}, char: null, bot: false, botLoop: false, forceInput: null, god: false, noMeta: false };
+const G = { screen: 'title', state: 'title', stage: null, stages: {}, selected: 'moon', tplSel: {}, chars: {}, char: null, bot: false, botLoop: false, forceInput: null, god: false, noMeta: false };
 let run = null;
 let eid = 1;
 
@@ -1143,11 +1211,13 @@ function newRun(st) {
   const unrest = new Int32Array(st.playableCount), pos = new Int32Array(st.N).fill(-1);
   let n = 0; for (let c = 0; c < st.N; c++) if (st.playable[c]) { unrest[n] = c; pos[c] = n; n++; }
   const ch = G.chars[G.char], bonus = runBonus(), hp = 5 + bonus.charm;
+  const tplId = TEMPLATES[G.tplSel[st.key]] ? G.tplSel[st.key] : recommendTemplate(st), tpl = TEMPLATES[tplId];
+  const nSprings = tpl.springCount ? tpl.springCount() : SPRING.count * (tpl.springs ?? 1);
   run = {
-    stage: st, t: 0, time: 0, kills: 0, ch, geo: heroGeo(ch.H), bonus,
+    stage: st, t: 0, time: 0, kills: 0, ch, geo: heroGeo(ch.H), bonus, tplId, tpl, act: 0, landmarks: [], tide: null,
     p: { x: sx, y: sy + 3, hp, hpMax: hp, inv: 0, fireAt: -9, facing: -1, moving: false, kbx: 0, kby: 0, kbT: 0, healT: 0, inWater: false },
     trail: { on: false, last: -1, prev: -1, cells: [], mark: new Uint8Array(st.N), pts: [] }, brushCells: 0, strokes: 0, caught: 0, cuts: 0, dries: 0, botPlan: null,
-    springs: placeSprings(st, sx, sy), sealed: 0, eroded: 0,
+    springs: placeSprings(st, sx, sy, nSprings), sealed: 0, eroded: 0,
     hue: new Int32Array(FAMS.length), hueLv: new Int8Array(FAMS.length), vineT: 4, shield: false, shieldT: 0,
     up: { blades: 0, rate: 0, dmg: 0, speed: 0, echo: 0, heart: 0, pierce: 0 },
     enemies: [], blades: [], parts: [], rings: [], queue: [],
@@ -1157,12 +1227,15 @@ function newRun(st) {
     nextThr: 0, pendingUp: 0, boss: null, bossSpawned: false, spawnAcc: 0.6, fireT: 0.4,
     shake: 0, clearT: 0, cam: { x: 0, y: 0, w: 300, h: 300 },
   };
+  if (tpl.setup) tpl.setup(run);
   computeCamera();
 }
 // 墨溜まり go to the darkest open ground (water counts as higher: blots born in water would just dissolve),
 // away from the start and from each other
-function placeSprings(st, sx, sy) {
-  const n = Math.max(0, Math.round(SPRING.count)), out = [], scx = Math.floor(sx / CELL), scy = Math.floor(sy / CELL), cand = [];
+function placeSprings(st, sx, sy, count) {
+  const n = Math.max(0, Math.round(count)), out = [], scx = Math.floor(sx / CELL), scy = Math.floor(sy / CELL), cand = [];
+  const make = (c) => { const x = c % st.CW, y = (c / st.CW) | 0; return { c, cx: x, cy: y, x: (x + 0.5) * CELL, y: (y + 0.5) * CELL, hp: SPRING.hp, maxHp: SPRING.hp, dead: false, eat: SPRING.eatEvery, eatMul: 1, flash: 0 }; };
+  if (st.mask && st.mask.springs.length) return st.mask.springs.map(make);
   for (let c = 0; c < st.N; c++) {
     if (!st.playable[c]) continue;
     const x = c % st.CW, y = (c / st.CW) | 0;
@@ -1180,10 +1253,255 @@ function placeSprings(st, sx, sy) {
     if (out.length >= n) break;
     const x = c % st.CW, y = (c / st.CW) | 0;
     if (out.some((q) => (q.cx - x) ** 2 + (q.cy - y) ** 2 < 14 * 14)) continue;
-    out.push({ c, cx: x, cy: y, x: (x + 0.5) * CELL, y: (y + 0.5) * CELL, hp: SPRING.hp, maxHp: SPRING.hp, dead: false, eat: SPRING.eatEvery, flash: 0 });
+    out.push(make(c));
   }
   return out;
 }
+/* ════════════════════════════════════════════════════════════
+   4b. Stage templates (型) — one picture, several games
+   A template sets how many 墨溜まり there are (springs × SPRING.count), what the goal is (goal → HUD text),
+   when 大墨 comes (bossReady) and how the stage turns over 序・破・急: acts[i].next(R) moves on to the
+   next act and acts[i].enter(R) makes the change. setup(R) runs once, update(R, dt) every frame.
+   ════════════════════════════════════════════════════════════ */
+const ACT_NAMES = ['序', '破', '急'];
+const ACT_SPAWN = [0.9, 1.1, 1.2]; // ink comes faster as the stage turns
+// template knobs (also on the #debug panel)
+const TPL = { landmarks: 3, landmarkDone: 0.85, seals: 5, calm: 16, high: 7, floodHurt: 2.5 };
+const TPL_ORDER = ['full', 'meisho', 'fuuin', 'shio'];
+// every number the #debug panel can change, with its starting value
+const CFG = { BRUSH, SPRING, HUE, TUNE, TPL };
+const CFG_DEFAULT = { BRUSH: { ...BRUSH }, SPRING: { ...SPRING }, HUE: { ...HUE }, TUNE: { bossAt: TUNE.bossAt, frontier: TUNE.frontier }, TPL: { ...TPL } };
+const TEMPLATES = {
+  full: {
+    name: '全面復元', desc: '絵のすべてに色を還す。復元率が上がると大墨が現れる。', springs: 1, bossPct: true,
+    acts: [
+      { next: () => pct() >= 30, enter: () => showBanner('破　墨が濃くなる') },
+      { next: (R) => R.bossSpawned },
+    ],
+    goal: (R) => (R.bossSpawned ? '大墨を祓う' : `復元率 ${TUNE.bossAt}%で大墨`),
+    bossReady: (R, p) => p >= TUNE.bossAt,
+  },
+  meisho: {
+    name: '名所めぐり', desc: '絵の名所を三つ還すと大墨が現れる。回る順番は自由。', springs: 0.67,
+    setup: (R) => { R.landmarks = makeLandmarks(R.stage); clearSpringsOffLandmarks(R); },
+    acts: [
+      { next: (R) => R.landmarks.some((m) => m.done), enter: (R) => { for (const q of R.springs) q.eatMul = 0.6; showBanner('破　墨溜まりが騒ぎだす'); } },
+      { next: (R) => R.bossSpawned },
+    ],
+    goal: (R) => (R.bossSpawned ? '大墨を祓う' : `名所 ${R.landmarks.map((m) => (m.done ? '◆' : '◇')).join('')}`),
+    bossReady: (R, p) => R.landmarks.every((m) => m.done) || p >= 95,
+    update: (R) => updateLandmarks(R),
+  },
+  fuuin: {
+    name: '墨溜まり封じ', desc: '目覚めていく墨溜まりをすべて封じると大墨が現れる。', springCount: () => Math.round(TPL.seals),
+    // more of them, so each is a little weaker; two awake at first
+    setup: (R) => { R.springs.forEach((q, i) => { q.dormant = i >= 2; q.hp = q.maxHp = Math.max(1, Math.round(SPRING.hp * 0.65)); }); },
+    acts: [
+      { next: (R) => R.sealed >= 1 || R.t >= 60, enter: (R) => { if (wakeSprings(R, 2)) showBanner('破　墨溜まりが目覚めた'); } },
+      { next: (R) => R.springs.every((q) => q.dead || q.dormant) || R.t >= 150, enter: (R) => { if (wakeSprings(R, 99, true)) showBanner('急　大墨溜まりが目覚めた'); } },
+    ],
+    goal: (R) => (R.bossSpawned ? '大墨を祓う' : `墨溜まり 封印 ${R.sealed}/${R.springs.length}`),
+    bossReady: (R, p) => R.springs.every((q) => q.dead) || p >= 92,
+  },
+  shio: {
+    name: '潮の満ち引き', desc: '暗い低地から墨の潮が満ちる。色を還した場所には潮が来ない。', springs: 0.67, bossPct: true,
+    setup: (R) => { R.tide = makeTide(R.stage); },
+    acts: [
+      { next: () => pct() >= 30, enter: (R) => { R.tide.q = 0.36; showBanner('破　潮が高くなる'); } },
+      { next: (R) => R.bossSpawned, enter: (R) => { R.tide.q = 0.46; } },
+    ],
+    goal: (R) => tideText(R),
+    bossReady: (R, p) => p >= TUNE.bossAt,
+    update: (R, dt) => updateTide(R, dt),
+  },
+};
+function updateActs(R) {
+  const step = R.tpl.acts[R.act];
+  if (step && step.next(R)) { R.act++; if (step.enter) step.enter(R); hudCache.goal = null; }
+}
+
+/* ── 名所めぐり: landmarks ── */
+// sizeable patches of one colour family (white counts half), spread apart and away from the start;
+// round patches fill in when the picture has too few
+function findLandmarks(st, n) {
+  const CW = st.CW, N = st.N, lab = new Int32Array(N).fill(-1), comps = [];
+  for (let s = 0; s < N; s++) {
+    if (lab[s] >= 0 || !st.playable[s] || st.fam[s] === NOFAM) continue;
+    const f = st.fam[s], cells = [s]; lab[s] = comps.length;
+    for (let h = 0; h < cells.length; h++) {
+      const c = cells[h], x = c % CW;
+      for (const m of [x > 0 ? c - 1 : -1, x < CW - 1 ? c + 1 : -1, c - CW, c + CW]) if (m >= 0 && m < N && lab[m] < 0 && st.playable[m] && st.fam[m] === f) { lab[m] = comps.length; cells.push(m); }
+    }
+    comps.push({ f, cells });
+  }
+  const sx = st.spawnCell % CW, sy = (st.spawnCell / CW) | 0, cen = (cells) => {
+    let x = 0, y = 0; for (const c of cells) { x += c % CW; y += (c / CW) | 0; } return [x / cells.length, y / cells.length];
+  };
+  const cand = comps.filter((k) => k.cells.length >= 24).map((k) => {
+    const cells = k.cells.length > 180 ? compact(st, k.cells, 180) : k.cells, [cx, cy] = cen(cells);
+    return { cells, cx, cy, score: Math.min(cells.length, 200) * (k.f === F_SHIRO ? 0.5 : 1) };
+  }).filter((k) => !k.cells.includes(st.spawnCell)).sort((a, b) => b.score - a.score);
+  const out = [];
+  for (const k of cand) {
+    if (out.length >= n) break;
+    if (!out.some((o) => (o.cx - k.cx) ** 2 + (o.cy - k.cy) ** 2 < 196)) out.push(k);
+  }
+  const real = out.length;
+  // open ground (a 7×7 block all walkable) as far as possible from the start and the others, up to ~20 cells
+  const open = (x, y) => { for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++) { const nx = x + dx, ny = y + dy; if (nx < 0 || ny < 0 || nx >= CW || ny >= st.CH || !st.playable[ny * CW + nx]) return false; } return true; };
+  while (out.length < n) {
+    let best = -1, bd = -1;
+    for (let c = 0; c < N; c++) {
+      if (!st.playable[c]) continue;
+      const x = c % CW, y = (c / CW) | 0;
+      if (!open(x, y)) continue;
+      const d = Math.min(400, (x - sx) ** 2 + (y - sy) ** 2, ...out.map((o) => (o.cx - x) ** 2 + (o.cy - y) ** 2));
+      if (d > bd) { bd = d; best = c; }
+    }
+    if (best < 0) break;
+    const bx = best % CW, by = (best / CW) | 0, cells = [];
+    for (let c = 0; c < N; c++) if (st.playable[c] && (c % CW - bx) ** 2 + (((c / CW) | 0) - by) ** 2 <= 20) cells.push(c);
+    out.push({ cells, cx: bx, cy: by });
+  }
+  return { regions: out.map((k) => k.cells), real };
+}
+// the `max` cells of a region nearest its middle, grown outward so the patch stays in one piece
+function compact(st, cells, max) {
+  const CW = st.CW, inR = new Set(cells);
+  let x = 0, y = 0; for (const c of cells) { x += c % CW; y += (c / CW) | 0; } x /= cells.length; y /= cells.length;
+  let seed = cells[0], bd = Infinity;
+  for (const c of cells) { const d = (c % CW - x) ** 2 + (((c / CW) | 0) - y) ** 2; if (d < bd) { bd = d; seed = c; } }
+  const out = [seed], seen = new Set([seed]);
+  for (let h = 0; h < out.length && out.length < max; h++) {
+    const c = out[h], cx = c % CW;
+    for (const m of [cx > 0 ? c - 1 : -1, cx < CW - 1 ? c + 1 : -1, c - CW, c + CW]) if (inR.has(m) && !seen.has(m) && out.length < max) { seen.add(m); out.push(m); }
+  }
+  return out;
+}
+function makeLandmarks(st) {
+  const regions = st.mask && st.mask.landmarks.length ? st.mask.landmarks : findLandmarks(st, Math.max(1, Math.round(TPL.landmarks))).regions;
+  const CW = st.CW, list = regions.map((cells) => {
+    const cnt = new Array(FAMS.length).fill(0);
+    for (const c of cells) if (st.fam[c] !== NOFAM) cnt[st.fam[c]]++;
+    const f = cnt.indexOf(Math.max(...cnt)), fam = cnt[f] ? f : -1;
+    const mark = new Uint8Array(st.N); for (const c of cells) mark[c] = 1;
+    let sx = 0, sy = 0; for (const c of cells) { sx += c % CW; sy += (c / CW) | 0; }
+    sx /= cells.length; sy /= cells.length;
+    let mid = cells[0], bd = Infinity;
+    for (const c of cells) { const d = (c % CW - sx) ** 2 + (((c / CW) | 0) - sy) ** 2; if (d < bd) { bd = d; mid = c; } }
+    // edges: [cell, side] where the neighbour on that side is outside (0 up, 1 right, 2 down, 3 left)
+    const edges = [];
+    for (const c of cells) {
+      const x = c % CW, y = (c / CW) | 0;
+      if (y === 0 || !mark[c - CW]) edges.push(c, 0);
+      if (x === CW - 1 || !mark[c + 1]) edges.push(c, 1);
+      if (y === st.CH - 1 || !mark[c + CW]) edges.push(c, 2);
+      if (x === 0 || !mark[c - 1]) edges.push(c, 3);
+    }
+    return { name: fam >= 0 ? `${FAMS[fam].name}の名所` : '名所', col: fam >= 0 ? FAMS[fam].col : C.gold, cells: Int32Array.from(cells), edges, c: mid, x: ((mid % CW) + 0.5) * CELL, y: (((mid / CW) | 0) + 0.5) * CELL, got: 0, done: false };
+  });
+  // the same name twice gets 一・二・三
+  const KANJI = ['一', '二', '三', '四', '五', '六'], seen = {};
+  for (const m of list) seen[m.name] = (seen[m.name] || 0) + 1;
+  const idx = {};
+  for (const m of list) if (seen[m.name] > 1) { idx[m.name] = (idx[m.name] || 0) + 1; m.name += KANJI[idx[m.name] - 1] || idx[m.name]; }
+  return list;
+}
+function updateLandmarks(R) {
+  for (const m of R.landmarks) {
+    if (m.done) continue;
+    let got = 0; for (const c of m.cells) if (R.restored[c]) got++;
+    m.got = got;
+    if (got >= m.cells.length * TPL.landmarkDone) completeLandmark(R, m);
+  }
+}
+function completeLandmark(R, m) {
+  m.done = true;
+  m.cells.forEach((c, i) => { if (!R.restored[c] && !R.queued[c]) queueRestore(c, 0.05 + (i / m.cells.length) * 0.4); });
+  const P = R.p;
+  if (P.hp < P.hpMax) { P.hp++; hudCache.hp = -1; }
+  for (const e of R.enemies) if (!e.dead && !e.boss && Math.hypot(e.x - m.x, e.y - m.y) < 64) purify(e);
+  if (!reduced) R.rings.push({ x: m.x, y: m.y, r: 8 * CELL, t: 0, dur: 0.9, big: true });
+  showBanner(`${m.name}が還った`); sfx('upgrade');
+  hudCache.goal = null;
+}
+
+// a 墨溜まり sitting on (or right next to) a 名所 would eat it from the inside: move it to other open ground
+function clearSpringsOffLandmarks(R) {
+  const st = R.stage, CW = st.CW, near = new Uint8Array(st.N);
+  for (const m of R.landmarks) for (const c of m.cells) {
+    const x = c % CW, y = (c / CW) | 0;
+    for (let dy = -4; dy <= 4; dy++) for (let dx = -4; dx <= 4; dx++) { const nx = x + dx, ny = y + dy; if (nx >= 0 && ny >= 0 && nx < CW && ny < st.CH) near[ny * CW + nx] = 1; }
+  }
+  const sx = st.spawnCell % CW, sy = (st.spawnCell / CW) | 0;
+  for (const q of R.springs) {
+    if (!near[q.c]) continue;
+    let best = -1, bd = Infinity;
+    for (let c = 0; c < st.N; c++) {
+      if (!st.playable[c] || near[c]) continue;
+      const x = c % CW, y = (c / CW) | 0;
+      if ((x - sx) ** 2 + (y - sy) ** 2 < 18 * 18 || R.springs.some((o) => o !== q && (o.cx - x) ** 2 + (o.cy - y) ** 2 < 14 * 14)) continue;
+      const d = st.height[c] + ((x - q.cx) ** 2 + (y - q.cy) ** 2) / 4000; // dark ground close to where it was
+      if (d < bd) { bd = d; best = c; }
+    }
+    if (best < 0) continue;
+    q.c = best; q.cx = best % CW; q.cy = (best / CW) | 0; q.x = (q.cx + 0.5) * CELL; q.y = (q.cy + 0.5) * CELL;
+  }
+}
+
+/* ── 墨溜まり封じ: sleeping springs wake up ── */
+function wakeSprings(R, n, big) {
+  let woke = 0, last = null;
+  for (const q of R.springs) if (!q.dead && q.dormant && woke < n) { q.dormant = false; q.eat = SPRING.eatEvery; woke++; last = q; }
+  if (big && last) { last.big = true; last.hp = last.maxHp = Math.round(last.maxHp * 2); }
+  hudCache.spr = -1;
+  return woke;
+}
+
+/* ── 潮の満ち引き: the tide ── */
+// lightness is height; the tide covers every gray playable cell below the level (restored cells stay dry)
+function makeTide(st) {
+  const hs = [];
+  for (let c = 0; c < st.N; c++) if (st.playable[c]) hs.push(st.height[c]);
+  hs.sort((a, b) => a - b);
+  return { hs, q: 0.22, level: 0, phase: 'calm', t: TPL.calm, hurt: 0 };
+}
+const TIDE_RISE = 3, TIDE_EBB = 3;
+const flooded = (R, c) => !!R.tide && R.tide.level > 0 && R.stage.playable[c] && !R.restored[c] && R.stage.height[c] <= R.tide.level;
+function updateTide(R, dt) {
+  const T = R.tide, P = R.p;
+  if ((T.t -= dt) <= 0) {
+    if (T.phase === 'calm') { T.phase = 'rise'; T.t = TIDE_RISE; showBanner('潮が満ちる'); sfx('boss', { vol: 0.35 }); }
+    else if (T.phase === 'rise') { T.phase = 'high'; T.t = TPL.high; }
+    else if (T.phase === 'high') { T.phase = 'ebb'; T.t = TIDE_EBB; }
+    else { T.phase = 'calm'; T.t = TPL.calm; }
+  }
+  const top = T.hs[Math.min(T.hs.length - 1, Math.floor(T.q * T.hs.length))] || 0;
+  T.level = T.phase === 'rise' ? top * (1 - T.t / TIDE_RISE) : T.phase === 'high' ? top : T.phase === 'ebb' ? top * (T.t / TIDE_EBB) : 0;
+  // standing in the flood hurts every few seconds
+  if (flooded(R, cellIndex(P.x, P.y))) {
+    if ((T.hurt += dt) >= TPL.floodHurt && P.inv <= 0) { T.hurt = 0; hitPlayer({ x: P.x, y: P.y - R.geo.mid - 6 }); }
+  } else T.hurt = 0;
+}
+function tideText(R) {
+  const T = R.tide;
+  if (R.bossSpawned && T.phase === 'calm') return `大墨を祓う　満潮まで ${Math.ceil(T.t)}秒`;
+  return { calm: `満潮まで ${Math.ceil(T.t)}秒`, rise: '潮が満ちてくる', high: `満潮　あと ${Math.ceil(T.t)}秒`, ebb: '潮が引いていく' }[T.phase];
+}
+
+// which 型 suits a picture: tall height spread → tides, three clear colour patches → landmarks, else springs
+function recommendTemplate(st) {
+  if (st.tplDefault && TEMPLATES[st.tplDefault]) return st.tplDefault;
+  if (st.rec) return st.rec;
+  const hs = [];
+  for (let c = 0; c < st.N; c++) if (st.playable[c]) hs.push(st.height[c]);
+  const mean = hs.reduce((a, v) => a + v, 0) / hs.length, sd = Math.sqrt(hs.reduce((a, v) => a + (v - mean) ** 2, 0) / hs.length);
+  const lm = st.mask && st.mask.landmarks.length >= 2 ? 3 : findLandmarks(st, 3).real;
+  st.rec = sd >= 0.15 ? 'shio' : lm >= 3 ? 'meisho' : 'fuuin';
+  st.recWhy = { sd: +sd.toFixed(3), landmarks: lm };
+  return st.rec;
+}
+
 
 const pct = () => (run ? (run.restoredPlayable / run.stage.playableCount) * 100 : 0);
 const cellIndex = (x, y) => {
@@ -1267,11 +1585,11 @@ function updateSprings(dt) {
   const R = run, st = R.stage, reach = Math.max(1, Math.round(SPRING.reach));
   const gray = (m) => st.playable[m] && !R.restored[m];
   for (const s of R.springs) {
-    if (s.dead) continue;
+    if (s.dead || s.dormant) continue;
     if (s.flash > 0) s.flash -= dt;
     s.eat -= dt;
     if (s.eat > 0) continue;
-    s.eat += Math.max(0.05, SPRING.eatEvery);
+    s.eat += Math.max(0.05, SPRING.eatEvery * s.eatMul);
     // eat back the coloured cell nearest the spring that borders gray ground, so the ink creeps outward
     let best = -1, bd = Infinity;
     for (let dy = -reach; dy <= reach; dy++) for (let dx = -reach; dx <= reach; dx++) {
@@ -1289,7 +1607,7 @@ function updateSprings(dt) {
   }
 }
 function hurtSpring(s, dmg) {
-  if (s.dead) return;
+  if (s.dead || s.dormant) return; // a sleeping spring can only be sealed by a brush stroke
   s.hp -= dmg; s.flash = 0.1;
   if (s.hp <= 0) sealSpring(s); else sfx('hit', { vol: 0.6 });
 }
@@ -1514,11 +1832,12 @@ const onScreen = (x, y) => { const c = run.cam; return x > c.x - 12 && x < c.x +
 
 function hpMult() { return 1 + run.t / 240; }
 
-function findSpawn(minD, maxD, preferOff) {
+function findSpawn(minD, maxD, preferOff, only) {
   const R = run, st = R.stage, P = R.p; if (!R.unrestN) return null;
   let fallback = null;
   for (let k = 0; k < 40; k++) {
     const c = R.unrest[(Math.random() * R.unrestN) | 0];
+    if (only && !only(c)) continue;
     const x = ((c % st.CW) + 0.2 + Math.random() * 0.6) * CELL, y = (((c / st.CW) | 0) + 0.2 + Math.random() * 0.6) * CELL;
     const d = Math.hypot(x - P.x, y - P.y);
     if (d < minD || d > maxD) continue;
@@ -1539,12 +1858,13 @@ function spawnOne() {
   const roll = Math.random() * (1 + wW + wB);
   if (roll > 1 + wW) type = 'big'; else if (roll > 1) type = 'wisp';
   // part of the ink wells up from a living 墨溜まり (not one right next to her)
-  const P = run.p, wells = run.springs.filter((q) => !q.dead && Math.hypot(q.x - P.x, q.y - P.y) > 90);
+  const P = run.p, wells = run.springs.filter((q) => !q.dead && !q.dormant && Math.hypot(q.x - P.x, q.y - P.y) > 90);
   let pos = null;
   if (wells.length && Math.random() < SPRING.spawnShare) {
     const q = wells[(Math.random() * wells.length) | 0], a = Math.random() * Math.PI * 2;
     pos = { x: q.x + Math.cos(a) * 6, y: q.y + Math.sin(a) * 6 };
   }
+  if (!pos && run.tide && run.tide.phase === 'high' && Math.random() < 0.5) pos = findSpawn(120, 260, true, (c) => flooded(run, c));
   pos = pos || findSpawn(150, 260, true) || findSpawn(90, Infinity, false);
   if (pos) addEnemy(type, pos.x, pos.y);
 }
@@ -1568,8 +1888,11 @@ function fire() {
   const R = run, P = R.p, ox = P.x, oy = P.y - R.geo.fan;
   let best = null, bd = Infinity;
   for (const e of R.enemies) { if (e.dead) continue; const d = (e.x - ox) ** 2 + (e.y - oy) ** 2; if (d < bd) { bd = d; best = e; } }
-  // no ink close by: aim at a 墨溜まり in reach
-  if (bd > 110 * 110) for (const q of R.springs) { if (q.dead) continue; const d = (q.x - ox) ** 2 + (q.y - oy) ** 2; if (d < 140 * 140 && d < bd) { bd = d; best = q; } }
+  // no ink close by: aim at a 墨溜まり in reach; standing right by one, every other volley goes to it anyway
+  const nearSpring = (r) => { let s0 = null, sd = r * r; for (const q of R.springs) { if (q.dead || q.dormant) continue; const d = (q.x - ox) ** 2 + (q.y - oy) ** 2; if (d < sd) { sd = d; s0 = q; } } return s0; };
+  const close = nearSpring(70);
+  if (close && (R.volley = (R.volley || 0) + 1) % 2 === 0) best = close;
+  else if (bd > 110 * 110) { const q = nearSpring(140); if (q) best = q; }
   const ang = best ? Math.atan2(best.y - oy, best.x - ox) : (P.facing > 0 ? 0 : Math.PI);
   P.fireAt = R.time; sfx('fan');
   const n = 3 + R.up.blades, spread = ((36 + (n - 3) * 10) * Math.PI) / 180;
@@ -1659,7 +1982,7 @@ function update(dt) {
   if (Math.abs(ix) > 0.1) P.facing = ix > 0 ? 1 : -1;
   const c0 = cellIndex(P.x, P.y);
   P.inWater = st.terrain[c0] === T_WATER;
-  const spd = BASE_SPEED * R.bonus.zori * (1 + 0.15 * R.up.speed) * (P.inWater ? 0.55 : 1) * (R.trail.on ? BRUSH.speed : 1);
+  const spd = BASE_SPEED * R.bonus.zori * (1 + 0.15 * R.up.speed) * (P.inWater ? 0.55 : 1) * (R.trail.on ? BRUSH.speed : 1) * (flooded(R, c0) ? 0.6 : 1);
   let mx = ix * spd * dt, my = iy * spd * dt;
   if (P.kbT > 0) { mx += P.kbx * dt; my += P.kby * dt; P.kbT -= dt; }
   if (mx || my) movePlayer(mx, my);
@@ -1684,6 +2007,8 @@ function update(dt) {
   updateTrail();
   updateSprings(dt);
   updateHue(dt);
+  if (R.tpl.update) R.tpl.update(R, dt);
+  if (G.state !== 'play') return; // the flood can end the run
 
   // ── weapon ──
   R.fireT -= dt;
@@ -1691,7 +2016,7 @@ function update(dt) {
 
   // ── spawning ──
   const rate = 0.8 + 2.4 * Math.min(R.t, 300) / 300;
-  R.spawnAcc += dt * rate * (R.boss ? 0.5 : 1);
+  R.spawnAcc += dt * rate * ACT_SPAWN[R.act] * (R.boss ? 0.5 : 1);
   while (R.spawnAcc >= 1) { R.spawnAcc -= 1; if (R.enemies.length < 140) spawnOne(); }
 
   // ── enemies ──
@@ -1705,6 +2030,7 @@ function update(dt) {
     let sp = e.spawnT > 0 ? e.spd * 0.3 : e.spd;
     if (e.slowT > 0) { e.slowT -= dt; sp *= e.boss ? (1 + e.slowMul) / 2 : e.slowMul; }
     if (e.rootT > 0) { e.rootT -= dt; sp = 0; }
+    if (R.tide && !e.boss && flooded(R, cellIndex(e.x, e.y))) sp *= 1.25; // ink is quicker in the flood
     e.vx = (dx / d) * sp; e.vy = (dy / d) * sp;
     let nx = e.x + e.vx * dt, ny = e.y + e.vy * dt;
     const cutter = e.boss || (ENEMY[e.type] && ENEMY[e.type].cuts);
@@ -1782,7 +2108,8 @@ function update(dt) {
   const p = pct();
   while (R.nextThr < THRESHOLDS.length && p >= THRESHOLDS[R.nextThr]) { R.nextThr++; R.pendingUp++; }
   if (R.pendingUp > 0) { openUpgrade(); return; }
-  if (!R.bossSpawned && p >= TUNE.bossAt) spawnBoss();
+  if (!R.bossSpawned && R.tpl.bossReady(R, p)) spawnBoss();
+  updateActs(R);
 }
 function updateParticles(dt) {
   const R = run;
@@ -1824,11 +2151,27 @@ function botInput() {
     }
   }
   if (bd === Infinity && G.botLoop) {
-    for (const q of R.springs) { if (q.dead) continue; const d = (q.x - P.x) ** 2 + (q.y - P.y) ** 2; if (d < 170 * 170 && d < bd) { bd = d; tx = q.x; ty = q.y; } }
+    const reach = R.tplId === 'fuuin' ? Infinity : 170 * 170; // 墨溜まり封じ: walk to any awake spring
+    for (const q of R.springs) { if (q.dead || q.dormant) continue; const d = (q.x - P.x) ** 2 + (q.y - P.y) ** 2; if (d < reach && d < bd) { bd = d; tx = q.x; ty = q.y; } }
     if (bd < Infinity) pull = bd < 50 * 50 ? 0 : 0.8;
   }
+  if (bd === Infinity && R.tide && flooded(R, here)) { // out of the flood: to the nearest dry (restored) ground
+    const pcx = Math.floor(P.x / CELL), pcy = Math.floor(P.y / CELL);
+    for (let dy = -16; dy <= 16; dy++) for (let dx = -16; dx <= 16; dx++) {
+      const x = pcx + dx, y = pcy + dy;
+      if (x < 0 || y < 0 || x >= st.CW || y >= st.CH || flooded(R, y * st.CW + x) || !st.playable[y * st.CW + x]) continue;
+      const d = dx * dx + dy * dy; if (d < bd) { bd = d; tx = (x + 0.5) * CELL; ty = (y + 0.5) * CELL; }
+    }
+  }
   if (bd === Infinity) {
-    for (let k = 0; k < R.unrestN; k += 1) {
+    // 名所めぐり: the gray cells of unfinished landmarks first
+    const goals = R.landmarks.filter((m) => !m.done);
+    if (goals.length) for (const m of goals) for (const c of m.cells) {
+      if (R.restored[c]) continue;
+      const x = ((c % st.CW) + 0.5) * CELL, y = (((c / st.CW) | 0) + 0.5) * CELL, d = (x - P.x) ** 2 + (y - P.y) ** 2;
+      if (d < bd) { bd = d; tx = x; ty = y; }
+    }
+    else for (let k = 0; k < R.unrestN; k += 1) {
       const c = R.unrest[k], x = ((c % st.CW) + 0.5) * CELL, y = (((c / st.CW) | 0) + 0.5) * CELL, d = (x - P.x) ** 2 + (y - P.y) ** 2;
       if (d < bd) { bd = d; tx = x; ty = y; }
     }
@@ -1919,11 +2262,51 @@ function render() {
   }
   L.globalAlpha = 1;
 
-  // 墨溜まり: dark pools with ripples spreading out; a vermilion arc shows the damage done
+  // 潮: gray low ground under a blue-black tide, with pale wave crests and a shoreline against dry ground
+  if (R.tide && R.tide.level > 0) {
+    const dry = (x, y) => x < 0 || y < 0 || x >= st.CW || y >= st.CH || !flooded(R, y * st.CW + x);
+    for (let yy = c0y; yy <= c1y; yy++) for (let xx = c0x; xx <= c1x; xx++) {
+      const c = yy * st.CW + xx;
+      if (!flooded(R, c)) continue;
+      const x = xx * CELL, y = yy * CELL;
+      L.globalAlpha = 0.62; L.fillStyle = C.ink; L.fillRect(x, y, CELL, CELL);
+      L.globalAlpha = 0.35; L.fillStyle = C.aiBlue; L.fillRect(x, y, CELL, CELL);
+      const h = hash(xx, yy, tick);
+      if ((h & 255) < 40) { L.globalAlpha = 0.55; L.fillStyle = C.blobThinRim; L.fillRect(x + ((h >>> 9) & 5), y + ((h >>> 13) & 7), 3, 1); }
+      L.globalAlpha = 0.6; L.fillStyle = C.shimmer;
+      if (st.playable[c - st.CW] && dry(xx, yy - 1)) L.fillRect(x, y, CELL, 1);
+      if (st.playable[c + st.CW] && dry(xx, yy + 1)) L.fillRect(x, y + CELL - 1, CELL, 1);
+      if (xx > 0 && st.playable[c - 1] && dry(xx - 1, yy)) L.fillRect(x, y, 1, CELL);
+      if (xx < st.CW - 1 && st.playable[c + 1] && dry(xx + 1, yy)) L.fillRect(x + CELL - 1, y, 1, CELL);
+    }
+    L.globalAlpha = 1;
+  }
+
+  // 名所: a pulsing dotted outline in the landmark's colour and a gold marker with its progress
+  for (const m of R.landmarks) {
+    if (m.done) continue;
+    L.globalAlpha = 0.55 + 0.25 * Math.sin(R.time * 3); L.fillStyle = m.col;
+    for (let j = 0; j < m.edges.length; j += 2) {
+      const c = m.edges[j], side = m.edges[j + 1], x = (c % st.CW) * CELL, y = ((c / st.CW) | 0) * CELL;
+      if (side === 0) for (let k = 0; k < CELL; k += 2) L.fillRect(x + k, y, 1, 1);
+      else if (side === 2) for (let k = 0; k < CELL; k += 2) L.fillRect(x + k, y + CELL - 1, 1, 1);
+      else if (side === 1) for (let k = 0; k < CELL; k += 2) L.fillRect(x + CELL - 1, y + k, 1, 1);
+      else for (let k = 0; k < CELL; k += 2) L.fillRect(x, y + k, 1, 1);
+    }
+    L.globalAlpha = 0.95; L.fillStyle = C.gold;
+    L.beginPath(); L.moveTo(m.x, m.y - 5); L.lineTo(m.x + 4, m.y); L.lineTo(m.x, m.y + 5); L.lineTo(m.x - 4, m.y); L.closePath(); L.fill();
+    L.strokeStyle = C.gold; L.lineWidth = 1.5;
+    L.beginPath(); L.arc(m.x, m.y, 8, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * Math.min(1, m.got / (m.cells.length * TPL.landmarkDone))); L.stroke();
+  }
+  L.globalAlpha = 1;
+
+  // 墨溜まり: dark pools with ripples spreading out; a vermilion arc shows the damage done; sleeping ones are faint
   for (const q of R.springs) {
     if (q.dead) continue;
+    const big = q.big ? 1.5 : 1;
+    if (q.dormant) { L.globalAlpha = 0.35; L.fillStyle = C.ink; L.beginPath(); L.ellipse(q.x, q.y, 9, 7, 0, 0, Math.PI * 2); L.fill(); continue; }
     L.globalAlpha = 0.92; L.fillStyle = q.flash > 0 ? C.blobRim : C.ink;
-    L.beginPath(); L.ellipse(q.x, q.y, 10, 8, 0, 0, Math.PI * 2); L.fill();
+    L.beginPath(); L.ellipse(q.x, q.y, 10 * big, 8 * big, 0, 0, Math.PI * 2); L.fill();
     L.strokeStyle = C.blobRim; L.lineWidth = 1;
     for (let i = 0; i < 2; i++) {
       const u = (R.time * 0.6 + i * 0.5 + q.cx * 0.13) % 1;
@@ -2027,9 +2410,9 @@ function render() {
   }
   ctx.globalAlpha = 1; ctx.textAlign = 'start';
 
-  // 墨溜まり off screen: a small ink arrow at the screen edge points to each one
-  for (const q of R.springs) {
-    if (q.dead) continue;
+  // off screen: a small arrow at the screen edge points to each awake 墨溜まり (ink) and unfinished 名所 (gold)
+  const marks = R.springs.filter((q) => !q.dead && !q.dormant).concat(R.landmarks.filter((m) => !m.done).map((m) => ({ x: m.x, y: m.y, gold: true })));
+  for (const q of marks) {
     const m = 14 * view.dpr, top = view.hudDev + m, sx = q.x * k + view.ox, sy = q.y * k + view.oy;
     if (sx > m && sx < cv.width - m && sy > top && sy < cv.height - m) continue;
     const cx2 = cv.width / 2, cy2 = (top + cv.height - m) / 2, ang = Math.atan2(sy - cy2, sx - cx2);
@@ -2037,7 +2420,7 @@ function render() {
     const t = Math.min(hw / Math.max(1e-6, Math.abs(Math.cos(ang))), hh / Math.max(1e-6, Math.abs(Math.sin(ang))));
     const r = 5 * view.dpr;
     ctx.save(); ctx.translate(cx2 + Math.cos(ang) * t, cy2 + Math.sin(ang) * t); ctx.rotate(ang);
-    ctx.globalAlpha = 0.9; ctx.fillStyle = C.ink; ctx.strokeStyle = C.blobThinRim; ctx.lineWidth = 1.5 * view.dpr;
+    ctx.globalAlpha = 0.9; ctx.fillStyle = q.gold ? C.gold : C.ink; ctx.strokeStyle = q.gold ? C.ink : C.blobThinRim; ctx.lineWidth = 1.5 * view.dpr;
     ctx.beginPath(); ctx.moveTo(r * 2.2, 0); ctx.lineTo(-r, -r * 1.3); ctx.lineTo(-r, r * 1.3); ctx.closePath(); ctx.fill(); ctx.stroke();
     ctx.restore();
   }
@@ -2139,7 +2522,7 @@ function showScreen(name) {
   if (name === 'game') resize();
 }
 
-const hudCache = { hp: -1, hpMax: -1, clock: '', pct: -1, retreat: null, boss: -1, sub: null, pw: null, spr: -1 };
+const hudCache = { hp: -1, hpMax: -1, clock: '', pct: -1, retreat: null, boss: -1, sub: null, pw: null, spr: -1, goal: null };
 function updateHud() {
   const R = run; if (!R) return;
   const P = R.p;
@@ -2182,12 +2565,13 @@ function updateHud() {
     };
     FAMS.forEach((f, i) => { if (R.hueLv[i]) chip(f.col, f.name, R.hueLv[i], f.power); });
     if (R.shield) chip(C.paper, '紙の盾', 0, '次の被弾を1回防ぐ');
-    box.hidden = !box.children.length;
   }
-  const left = R.springs.reduce((n, q) => n + (q.dead ? 0 : 1), 0);
-  if (left !== hudCache.spr) {
-    hudCache.spr = left;
-    $('sprInfo').hidden = !left; $('sprInfo').innerHTML = `墨溜まり <b>${'●'.repeat(left)}</b>`;
+  const goal = ACT_NAMES[R.act] + R.tpl.goal(R);
+  if (goal !== hudCache.goal) { hudCache.goal = goal; $('actName').textContent = ACT_NAMES[R.act]; $('goalText').textContent = R.tpl.goal(R); }
+  const left = R.springs.reduce((n, q) => n + (q.dead ? 0 : 1), 0), asleep = R.springs.reduce((n, q) => n + (!q.dead && q.dormant ? 1 : 0), 0);
+  if (left * 10 + asleep !== hudCache.spr) {
+    hudCache.spr = left * 10 + asleep;
+    $('sprInfo').hidden = !left; $('sprInfo').innerHTML = `墨溜まり <b>${'●'.repeat(left - asleep)}${'○'.repeat(asleep)}</b>`;
   }
   const sub = showRetreat || bossFrac >= 0 || left > 0;
   if (sub !== hudCache.sub) { hudCache.sub = sub; $('hudSub').hidden = !sub; }
@@ -2272,6 +2656,7 @@ function startRun() {
   const st = G.stages[G.selected]; if (!st || !G.chars[G.char]) return;
   G.stage = st; newRun(st);
   $('bossMark').style.left = `${clamp(TUNE.bossAt, 0, 100)}%`;
+  $('bossMark').hidden = !run.tpl.bossPct;
   for (const k in hudCache) hudCache[k] = k === 'clock' ? '' : (typeof hudCache[k] === 'number' ? -2 : null);
   $('upOv').classList.remove('on'); $('pauseOv').classList.remove('on'); $('banner').classList.remove('show');
   keys.clear(); joy.active = false;
@@ -2280,16 +2665,16 @@ function startRun() {
   updateHud();
   last = performance.now();
 }
-function bestKey(st) { return `irogaeshi:best:${st.key}`; }
+function bestKey(st, tpl) { return `irogaeshi:best:${st.key}${tpl && tpl !== 'full' ? `:${tpl}` : ''}`; }
 function endRun(kind) {
   const R = run, st = R.stage;
   const p = kind === 'clear' ? 100 : Math.floor(pct());
   const rec = kind === 'death' ? Math.floor(p / 2) : p;
   G.state = 'result';
-  const prev = store.get(bestKey(st));
+  const prev = store.get(bestKey(st, R.tplId));
   const isBest = !prev || rec > prev.pct || (rec === prev.pct && kind === 'clear' && prev.outcome === 'clear' && R.t < prev.time);
   // autopilot (debug pacing) runs touch neither the records nor the 香料
-  if (isBest && rec > 0 && !G.bot) store.set(bestKey(st), { pct: rec, time: Math.floor(R.t), outcome: kind });
+  if (isBest && rec > 0 && !G.bot) store.set(bestKey(st, R.tplId), { pct: rec, time: Math.floor(R.t), outcome: kind });
   // 香料: 1 per % restored, +30 for a clear; a fall keeps only part of it (風呂敷 raises that share)
   const earned = G.bot ? 0 : Math.floor((p + (kind === 'clear' ? 30 : 0)) * (kind === 'death' ? R.bonus.cloth : 1));
   if (earned > 0) { META.koryo += earned; saveMeta(); }
@@ -2297,6 +2682,7 @@ function endRun(kind) {
   $('rPw').innerHTML = pw.length ? `色の力　<b>${pw.join('・')}</b>　墨溜まり <b>${R.sealed}/${R.springs.length}</b> 封印` : '';
   $('rEarn').innerHTML = earned > 0 ? `${CURRENCY} <b>+${earned}</b>　所持 <b>${META.koryo}</b>　（タイトルの工房で使える）` : '';
   // result UI
+  $('rSub').dataset.tpl = R.tpl.name;
   const T = { clear: ['彩、還る。', '大墨を祓い、すべての色が還った。'], retreat: ['撤収', '取り戻した色を持ち帰った。記録はそのまま残る。'], death: ['墨に呑まれた', '倒れてしまった。記録は半分になる。'] }[kind];
   $('rTitle').textContent = T[0]; $('rTitle').classList.toggle('clear', kind === 'clear');
   $('rSub').textContent = T[1];
@@ -2334,7 +2720,7 @@ function renderPreview() {
   const legend = $('legend'); legend.textContent = '';
   if (!st) {
     $('pvName').textContent = G.selected === 'upload' ? '画像からつくる' : '準備中…';
-    $('pvPw').textContent = '';
+    $('pvPw').textContent = ''; $('tpls').textContent = ''; $('tplDesc').textContent = '';
     const tm = $('tmap'); tm.getContext('2d').clearRect(0, 0, tm.width, tm.height);
     $('pvBest').innerHTML = G.selected === 'upload' ? '画像を選ぶと、色から地形が生まれる。' : '読み込み中…';
     $('startBtn').disabled = true;
@@ -2357,7 +2743,19 @@ function renderPreview() {
     li.children[1].textContent = nm; li.children[2].textContent = hint; li.children[3].textContent = `${Math.round(v)}%`;
     legend.appendChild(li);
   }
-  const b = store.get(bestKey(st));
+  // 型: one chip per template, the suggested one marked
+  const rec = recommendTemplate(st), sel = TEMPLATES[G.tplSel[st.key]] ? G.tplSel[st.key] : rec, box = $('tpls');
+  box.textContent = '';
+  for (const id of TPL_ORDER) {
+    const t = TEMPLATES[id], b2 = document.createElement('button');
+    b2.type = 'button'; b2.className = 'tplb'; b2.setAttribute('aria-pressed', String(id === sel));
+    b2.innerHTML = `<span></span>${id === rec ? '<small>おすすめ</small>' : ''}`;
+    b2.firstChild.textContent = t.name;
+    b2.addEventListener('click', () => { sfx('click'); G.tplSel[st.key] = id; renderPreview(); });
+    box.appendChild(b2);
+  }
+  $('tplDesc').textContent = TEMPLATES[sel].desc;
+  const b = store.get(bestKey(st, sel));
   const oc = { clear: '還', retreat: '撤収', death: '倒れた' };
   $('pvBest').innerHTML = b ? `最高記録 <b>${b.pct}%</b>（${oc[b.outcome] || ''}・${fmtTime(b.time)}）` : '最高記録 <b>―</b> まだ記録はない';
   $('startBtn').disabled = !G.chars[G.char];
@@ -2604,15 +3002,15 @@ function boot() {
   loadMeta(); updateWallet();
   prepSmall(); prepBlobs(); prepBlades();
   buildCards(); buildCharCards();
-  const ready = (def, src, w, h) => {
-    G.stages[def.id] = buildStage(src, w, h, { key: def.id, name: def.name });
+  const ready = (def, src, w, h, mask) => {
+    G.stages[def.id] = buildStage(src, w, h, { key: def.id, name: def.name, template: def.template, mask });
     drawCover(cardFor(def.id).querySelector('canvas'), G.stages[def.id].colorCanvas);
     if (G.selected === def.id) renderPreview();
   };
   G.selected = STAGES[0].id;
   for (const def of STAGES) {
     if (def.kind === 'procedural') { const c = def.src(); ready(def, c, c.width, c.height); }
-    else loadImg(def.src).then((img) => ready(def, img, img.naturalWidth, img.naturalHeight)).catch(() => {});
+    else Promise.all([loadImg(def.src), def.mask ? loadImg(def.mask).catch(() => null) : null]).then(([img, mask]) => ready(def, img, img.naturalWidth, img.naturalHeight, mask)).catch(() => {});
   }
   selectStage(G.selected);
   const saved = store.get(CHAR_KEY);
@@ -2715,6 +3113,13 @@ function buildDebug() {
     ['TUNE', 'bossAt', 'ボスが出る復元率', '%', 1],
     ['TUNE', 'frontier', '境界で祓うと広がる', 'マス', 1],
     ['HUE', 'scale', '色の力に必要なマス数', '倍', 0.1],
+    ['型'],
+    ['TPL', 'landmarks', '名所の数（次のプレイから）', '個', 1],
+    ['TPL', 'landmarkDone', '名所が還る割合', '', 0.05],
+    ['TPL', 'seals', '封じの墨溜まりの数（次から）', '個', 1],
+    ['TPL', 'calm', '潮が引いている長さ', '秒', 1],
+    ['TPL', 'high', '満潮の長さ', '秒', 1],
+    ['TPL', 'floodHurt', '潮の中で傷を受ける間隔', '秒', 0.5],
   ];
   const box = document.createElement('div'); box.className = 'dbg';
   box.innerHTML = `<div class="dbg-p" id="dbgP" role="region" aria-label="デバッグ" hidden>
@@ -2764,7 +3169,7 @@ function buildDebug() {
       try { for (let i = 0; i < 3; i++) { startRun(); rows.push(autoplay(600, true)); } }
       finally { G.noMeta = keepMeta; G.botLoop = false; toTitle(); }
       const avg = (f) => { const a = rows.map(f).filter((v) => v != null); return a.length ? a.reduce((s2, v) => s2 + v, 0) / a.length : NaN; };
-      out.textContent = `${st.name}・${loop ? '線で囲む' : '歩き続ける'}操作（ボス ${TUNE.bossAt}%）\n`
+      out.textContent = `${st.name}・${run.tpl.name}・${loop ? '線で囲む' : '歩き続ける'}操作\n`
         + `ボス出現まで 平均 ${Math.round(avg((r) => r.boss))}秒（${rows.map((r) => (r.boss != null ? Math.round(r.boss) : '―')).join(' / ')}）　クリア ${Math.round(avg((r) => r.t))}秒\n`
         + `筆で囲んで戻した割合 ${avg((r) => r.brush).toFixed(1)}%（${Math.round(avg((r) => r.strokes))}回・墨 ${Math.round(avg((r) => r.caught))}体）\n`
         + `墨溜まりの封印 ${avg((r) => r.sealed).toFixed(1)}/${rows[0].springs}　食べられた色 ${avg((r) => r.eroded).toFixed(1)}%`;
@@ -2776,7 +3181,7 @@ function buildDebug() {
     if (act === 'cfgReset') { resetCfg(); saveDebugTune(); sync(); out.textContent = '初期値に戻した。'; }
     else if (act === 'cfgCopy') {
       const obj = (o) => JSON.stringify(o).replace(/"(\w+)":/g, '$1: ').replace(/,/g, ', ').replace(/^\{/, '{ ').replace(/\}$/, ' }');
-      const text = `const BRUSH = ${obj(BRUSH)};\nconst SPRING = ${obj(SPRING)};\nconst HUE = ${obj(HUE)};\nTUNE.bossAt = ${TUNE.bossAt}; TUNE.frontier = ${TUNE.frontier};`;
+      const text = `const BRUSH = ${obj(BRUSH)};\nconst SPRING = ${obj(SPRING)};\nconst HUE = ${obj(HUE)};\nconst TPL = ${obj(TPL)};\nTUNE.bossAt = ${TUNE.bossAt}; TUNE.frontier = ${TUNE.frontier};`;
       out.textContent = text;
       try { navigator.clipboard.writeText(text).then(() => { out.textContent = `${text}\n（コピーした）`; }, () => {}); } catch (err) { /* shown above */ }
     }
@@ -2792,7 +3197,8 @@ function buildDebug() {
 
 function exposeDebug() { window.__dbg = {
   G, get run() { return run; }, pct, TUNE, ENEMY, BRUSH, SPRING, HUE, CFG, META, SHOP, FAMS, stats: (k) => G.stages[k] && G.stages[k].stats,
-  start(key) { if (key) selectStage(key); startRun(); },
+  start(key, tpl) { if (key) selectStage(key); if (tpl) G.tplSel[G.selected] = tpl; startRun(); },
+  TEMPLATES, TPL, recommendTemplate,
   forcePct,
   spawnBoss() { if (!run.bossSpawned) spawnBoss(); },
   killBoss() { if (run.boss) { hurtEnemy(run.boss, 1e9); } },

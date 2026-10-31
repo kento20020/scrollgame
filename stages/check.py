@@ -155,7 +155,7 @@ def stage_list():
     listed = {e["file"] for e in manifest}
     for fn in sorted(os.listdir(HERE)):
         stem, ext = os.path.splitext(fn)
-        if ext.lower() in IMG_EXT and not fn.startswith("preview_") and fn not in listed:
+        if ext.lower() in IMG_EXT and not fn.startswith("preview_") and not stem.endswith("_mask") and fn not in listed:
             manifest.append({"id": stem, "name": stem, "file": fn})
     return manifest
 
