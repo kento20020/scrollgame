@@ -36,6 +36,9 @@
   --gray-hi:#c6ccd9;
   --glow-warm:#ff9a5c;
   --shimmer:#e4f6f0;
+  --midori:#6fae5e;      /* colour powers: 緑 / 藍 / 紫 */
+  --ai-blue:#5b86c9;
+  --murasaki:#9b72c4;
   --font-title:"Zen Antique","Noto Serif JP","Hiragino Mincho ProN",serif;
   --font-body:"Zen Kaku Gothic New","Hiragino Sans","Noto Sans JP",sans-serif;
   --font-dot:"DotGothic16","Noto Sans Mono CJK JP",ui-monospace,monospace;
@@ -118,6 +121,10 @@ button{font:inherit;color:inherit}
 .best{font-size:12px;margin:8px 0 10px;color:var(--muted);line-height:1.5}
 .best b{color:var(--paper);font-family:var(--font-dot);font-weight:400}
 .pv-msg{font-size:12px;color:var(--peony);margin:6px 0 0}
+.pv-pw{font-size:12px;margin:-4px 0 8px;color:var(--muted);line-height:1.6}
+.pv-pw:empty{display:none}
+.pv-pw span{white-space:nowrap}
+.pv-pw i{display:inline-block;width:8px;height:8px;background:var(--c);margin-right:3px}
 #file,#cfile{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
 @media (min-width:820px) and (min-height:560px){
   .t-wrap{grid-template-columns:auto minmax(0,1fr);grid-template-areas:"portrait hero" "portrait chars" "portrait stages" "portrait preview"}
@@ -165,6 +172,19 @@ button{font:inherit;color:inherit}
 .sub[hidden]{display:none}
 .bossbar{flex:1;display:flex;align-items:center;gap:8px;min-width:0}
 .bossbar[hidden]{display:none}
+.pw{gap:6px;flex-wrap:wrap}
+.pw[hidden]{display:none}
+.pwc{display:inline-flex;align-items:center;gap:4px;font-size:12px;line-height:1;padding:3px 6px 3px 4px;border:1px solid var(--line);border-radius:2px;background:var(--ink)}
+.pwc i{display:block;width:8px;height:8px;background:var(--c)}
+.pwc b{font-weight:400;color:var(--gold)}
+.spr{margin-right:auto;font-size:12px;color:var(--muted);white-space:nowrap}
+.spr b{font-weight:400;color:var(--paper);letter-spacing:1px}
+.spr[hidden]{display:none}
+.pz-pw{list-style:none;margin:0 auto 16px;padding:0;display:grid;gap:6px;max-width:480px;text-align:left;font-size:13px;line-height:1.4}
+.pz-pw:empty{display:none}
+.pz-pw li{display:grid;grid-template-columns:10px 4.2em minmax(0,1fr) auto;gap:8px;align-items:center}
+.pz-pw .sw{width:10px;height:10px;display:block}
+.pz-pw .pv{font-family:var(--font-dot);font-size:12px;color:var(--muted)}
 .bossbar .lbl{color:var(--shu);font-size:13px;white-space:nowrap}
 .bossbar .fill{background:var(--shu)}
 .btn-small{border:1px solid var(--muted);background:var(--ai-2);font-family:var(--font-dot);font-size:13px;line-height:1;padding:8px 12px;border-radius:4px;cursor:pointer;white-space:nowrap}
@@ -259,7 +279,8 @@ button{font:inherit;color:inherit}
           <h2>遊び方</h2>
           <p>移動＝WASD／矢印キー。スマホは画面をドラッグ。攻撃は自動。</p>
           <p>墨を祓うと、その場所に色が還る。色の戻った場所では墨が湧かない。</p>
-          <p>復元率が60%を超えると、立ち止まったときに足元に色がにじむ。</p>
+          <p>色のある場所から灰色へ出ると筆の線が引かれる。色の上に戻って線を閉じると、囲んだ所がまとめて色づく。</p>
+          <p>墨溜まりは墨を生み、色を食べる。風の刃で削るか、筆で囲んで封じる。取り戻した色の種類ごとに、色の力が育つ。</p>
         </div>
         <div class="t-btns">
           <button type="button" class="snd snd-t" id="muteTitle" data-muted="false"><svg viewBox="0 0 18 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 5.5h3l4-3.5v12l-4-3.5H2z" fill="currentColor" stroke="none"/><path class="w" d="M12 5.2q1.6 2.8 0 5.6M14.4 3.2q3 4.8 0 9.6"/><path class="x" d="M12 5.5l4.5 5M16.5 5.5l-4.5 5"/></svg><span class="snd-l">音 あり</span></button>
@@ -285,6 +306,7 @@ button{font:inherit;color:inherit}
         <div class="pv-info">
           <h3 class="pv-name" id="pvName">月夜の水庭</h3>
           <ul class="legend" id="legend"></ul>
+          <p class="pv-pw" id="pvPw"></p>
           <p class="best" id="pvBest">最高記録 <b>―</b></p>
           <button class="btn primary" id="startBtn" disabled>はじめる</button>
           <p class="pv-msg" id="pvMsg" hidden></p>
@@ -313,7 +335,9 @@ button{font:inherit;color:inherit}
           </div>
           <span class="pct" id="pct">0%</span>
         </div>
+        <div class="hud-row pw" id="hudPw" hidden></div>
         <div class="hud-row sub" id="hudSub" hidden>
+          <span class="spr" id="sprInfo" hidden></span>
           <div class="bossbar" id="bossbar" hidden><span class="lbl">大墨</span><div class="bar"><div class="fill" id="bossfill"></div></div></div>
           <button class="btn-small" id="retreatBtn" hidden>撤収する</button>
         </div>
@@ -330,6 +354,7 @@ button{font:inherit;color:inherit}
         <div class="ov-panel">
           <h2 class="ov-title" id="pzTitle">一時停止</h2>
           <p class="ov-sub">P または Esc でも再開できる</p>
+          <ul class="pz-pw" id="pzPw" aria-label="色の力"></ul>
           <div class="actions"><button class="btn primary" id="resumeBtn">再開する</button><button class="btn" id="quitBtn">ステージを選ぶ</button></div>
         </div>
       </div>
@@ -352,6 +377,7 @@ button{font:inherit;color:inherit}
       </dl>
       <p class="newbest" id="rBest" hidden>自己ベスト更新</p>
       <p class="earn" id="rEarn"></p>
+      <p class="earn" id="rPw"></p>
       <div class="actions"><button class="btn primary" id="againBtn">もう一度</button><button class="btn" id="backBtn">ステージを選ぶ</button></div>
     </div>
   </section>
@@ -405,6 +431,7 @@ const C = {
   blobThin: tok('--blob-thin', '#3a4870'), blobThinRim: tok('--blob-thin-rim', '#8492bd'),
   grayLo: tok('--gray-lo', '#10141f'), grayHi: tok('--gray-hi', '#c6ccd9'),
   glowWarm: tok('--glow-warm', '#ff9a5c'), shimmer: tok('--shimmer', '#e4f6f0'),
+  midori: tok('--midori', '#6fae5e'), aiBlue: tok('--ai-blue', '#5b86c9'), murasaki: tok('--murasaki', '#9b72c4'),
 };
 function rgb(hex) {
   let h = hex.replace('#', '');
@@ -427,6 +454,7 @@ function loadImg(src) {
 const fmtTime = (s) => { s = Math.max(0, Math.floor(s)); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
 const fmtClock = (s) => { s = Math.max(0, Math.floor(s)); return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`; };
 
+const FONT_DOT = tok('--font-dot', 'monospace');
 const reduceMQ = window.matchMedia ? matchMedia('(prefers-reduced-motion: reduce)') : null;
 let reduced = !!(reduceMQ && reduceMQ.matches);
 if (reduceMQ && reduceMQ.addEventListener) reduceMQ.addEventListener('change', (e) => { reduced = e.matches; });
@@ -536,6 +564,26 @@ function rgbToHsl(r, g, b) {
   return [h, s, l, d];
 }
 // chroma-based (C = max − min, 0–1) so pale cream / paper never reads as 朱
+// Colour families: every restored cell of a family grows that family's power (see 色の力 in section 5).
+const FAMS = [
+  { id: 'shu', name: '朱', col: C.shu, power: '風の刃が墨を燃やす' },
+  { id: 'kin', name: '金', col: C.gold, power: '会心が出て、威力が2倍になる' },
+  { id: 'midori', name: '緑', col: C.midori, power: '蔦が近くの墨を縛る' },
+  { id: 'ai', name: '藍', col: C.aiBlue, power: '風の刃が墨を遅くする' },
+  { id: 'murasaki', name: '紫', col: C.murasaki, power: '体のまわりの墨を毒で削る' },
+  { id: 'shiro', name: '白', col: C.paper, power: '紙の盾が被弾を1回防ぐ' },
+];
+const F_SHU = 0, F_KIN = 1, F_MIDORI = 2, F_AI = 3, F_MURASAKI = 4, F_SHIRO = 5, NOFAM = 255;
+// hue (deg), lightness, chroma (0–1) → family; greys and earthy browns belong to none
+function famOf(h, l, c) {
+  if (c < 0.12) return l >= 0.72 ? F_SHIRO : NOFAM;
+  if (h < 15 || h >= 330) return F_SHU;
+  if (h < 50) return l >= 0.45 && c >= 0.2 ? F_KIN : NOFAM;
+  if (h < 70) return F_KIN;
+  if (h < 170) return F_MIDORI;
+  if (h < 260) return F_AI;
+  return F_MURASAKI;
+}
 function classify(h, l, c, wallT) {
   if (l < wallT) return T_WALL;
   if (h >= 170 && h <= 255 && c >= 0.15 && l <= 0.80) return T_WATER;
@@ -586,6 +634,12 @@ function buildStage(src, sw, sh, meta) {
     count = playable.reduce((a, v) => a + v, 0);
   }
   for (let c = 0; c < N; c++) if (!playable[c] && terrain[c] !== T_WALL) terrain[c] = T_SEALED;
+  // colour family per cell, and lightness as height (墨溜まり settle in the darkest, lowest ground)
+  const fam = new Uint8Array(N), height = new Float32Array(N), famCount = new Array(FAMS.length).fill(0);
+  for (let c = 0; c < N; c++) {
+    fam[c] = famOf(hsl[c * 4], hsl[c * 4 + 2], hsl[c * 4 + 3]); height[c] = hsl[c * 4 + 2];
+    if (playable[c] && fam[c] !== NOFAM) famCount[fam[c]]++;
+  }
   // spawn: playable floor cell nearest the centre, preferring ones with open neighbours
   const spawnCell = (() => {
     let best = -1, bd = Infinity, fb = -1, fbd = Infinity;
@@ -612,7 +666,7 @@ function buildStage(src, sw, sh, meta) {
   const grayCanvas = makeCanvas(AW, AH); grayCanvas.getContext('2d').putImageData(new ImageData(gray, AW, AH), 0, 0);
   return {
     key: meta.key, name: meta.name, AW, AH, CW, CH, N, W: AW * ART_WORLD, H: AH * ART_WORLD,
-    color, gray, colorCanvas, grayCanvas, terrain, playable, playableCount: count, spawnCell, stats, wallT,
+    color, gray, colorCanvas, grayCanvas, terrain, playable, playableCount: count, spawnCell, stats, wallT, fam, height, famCount,
   };
 }
 
@@ -1017,19 +1071,27 @@ const THRESHOLDS = [15, 30, 45, 60, 75];
 const ENEMY = {
   blot: { hp: 2, spd: 30, r: 5, rr: 3 },
   wisp: { hp: 1, spd: 52, r: 4, rr: 2 },
-  big:  { hp: 9, spd: 22, r: 9, rr: 5 },
+  big:  { hp: 9, spd: 22, r: 9, rr: 5, cuts: true }, // cuts: breaks a brush line it walks onto (the rest are held back by it)
 };
 // Pacing knobs. discBias: restore disc uses d² ≤ r² + discBias.
 // topUp: if a kill lands mostly on already-restored ground, the ripple keeps
 // going to the nearest gray cells until (topUp × disc size) new cells are restored.
-// bossAt: 復元率 (%) at which 大墨 appears — also tunable from the #debug panel
-const TUNE = { discBias: 1, topUp: 0.24, rrScale: 0.62, bossAt: 75 };
-const BOSS_AT_DEFAULT = TUNE.bossAt;
-// Foot painting, available once 復元率 reaches `unlock` %: stand still for `delay` s and the gauge starts;
-// `charge` s later the ground under her feet takes colour (a disc of `radius` cells). Standing on repeats it,
-// `grow` cells wider each time up to `maxRadius`. Moving, knockback or a hit resets it. All tunable from #debug.
-const FOOT = { unlock: 60, delay: 1.0, charge: 3.0, radius: 1, grow: 1, maxRadius: 2 };
-const FOOT_DEFAULT = { ...FOOT };
+// bossAt: 復元率 (%) at which 大墨 appears. frontier: extra restore radius for a kill on the edge of her colour.
+const TUNE = { discBias: 1, topUp: 0.24, rrScale: 0.62, bossAt: 75, frontier: 1 };
+// 筆で囲む: stepping off her colour into gray draws a brush line; stepping back onto colour closes it and fills
+// every gray pocket the line cut off (all but the biggest side), purifying the ink caught inside. Small ink
+// cannot cross the line; big ink and the boss break it, and so does a hit.
+// maxLen: cells one stroke may run (筆の墨); maxArea: biggest pocket one stroke fills; speed: walk speed while drawing.
+const BRUSH = { maxLen: 40, maxArea: 260, speed: 0.9, minLen: 3, unlock: 0 };
+// 墨溜まり: ink springs in the darkest (lowest) ground. Each sends out ink blots, eats colour back within `reach`
+// cells (one cell every `eatEvery` s) and has `hp`: blades wear it down, a brush stroke around it seals it at once.
+const SPRING = { count: 3, hp: 40, reach: 8, eatEvery: 0.7, spawnShare: 0.35 };
+// 色の力: restored cells of a family → power level; Lv1–5 at these counts × scale
+const HUE = { scale: 1 };
+const HUE_LV = [30, 90, 200, 380, 640];
+// every number the #debug panel can change, with its starting value
+const CFG = { BRUSH, SPRING, HUE, TUNE };
+const CFG_DEFAULT = { BRUSH: { ...BRUSH }, SPRING: { ...SPRING }, HUE: { ...HUE }, TUNE: { bossAt: TUNE.bossAt, frontier: TUNE.frontier } };
 
 // 工房 — permanent, deliberately small boosts bought with 香料 earned at the end of every run.
 // val(lv) is what the run uses (see newRun); stat + fmt(lv) is what the card shows.
@@ -1037,7 +1099,7 @@ const CURRENCY = '香料';
 const SHOP = [
   { id: 'fan',   tool: '扇', smith: '扇師',   name: '扇の手入れ',   desc: '風を放つ間隔が少し短くなる',                     max: 5, cost: 30, val: (l) => 0.97 ** l,     stat: '風の間隔', fmt: (l) => `−${3 * l}%` },
   { id: 'zori',  tool: '履', smith: '履物師', name: '草履の鼻緒',   desc: '歩く速さが少し上がる',                           max: 5, cost: 30, val: (l) => 1 + 0.02 * l,  stat: '歩く速さ', fmt: (l) => `+${2 * l}%` },
-  { id: 'brush', tool: '筆', smith: '筆師',   name: '筆おろし',     desc: '立ち止まってから足元が濡れるまでが少し早くなる', max: 5, cost: 30, val: (l) => 1 - 0.04 * l,  stat: '溜め時間', fmt: (l) => `−${4 * l}%` },
+  { id: 'brush', tool: '筆', smith: '筆師',   name: '筆おろし',     desc: '一筆で引ける線が少し長くなる',                   max: 5, cost: 30, val: (l) => 4 * l,         stat: '筆の墨',   fmt: (l) => `+${4 * l}マス` },
   { id: 'ink',   tool: '硯', smith: '硯師',   name: '硯の墨',       desc: '色づいた場所で墨を祓っても、近くの灰色に色が届きやすい', max: 5, cost: 40, val: (l) => 0.02 * l,      stat: '追い塗り', fmt: (l) => `+${2 * l}%` },
   { id: 'charm', tool: '守', smith: '宮司',   name: '灯のお守り',   desc: '最大体力が1増える',                              max: 2, cost: 90, val: (l) => l,             stat: '最大体力', fmt: (l) => `+${l}` },
   { id: 'cloth', tool: '包', smith: '行商人', name: '丈夫な風呂敷', desc: '倒れたときに持ち帰れる香料が増える',             max: 3, cost: 30, val: (l) => 0.5 + 0.1 * l, stat: '持ち帰り', fmt: (l) => `${50 + 10 * l}%` },
@@ -1068,7 +1130,7 @@ const UPGRADES = [
 const PLAYER_R = 4;          // collision radius at the feet (fits a 1-cell corridor)
 const BASE_SPEED = 62;
 
-const G = { screen: 'title', state: 'title', stage: null, stages: {}, selected: 'moon', chars: {}, char: null, bot: false, botStand: false, god: false, noMeta: false };
+const G = { screen: 'title', state: 'title', stage: null, stages: {}, selected: 'moon', chars: {}, char: null, bot: false, botLoop: false, forceInput: null, god: false, noMeta: false };
 let run = null;
 let eid = 1;
 
@@ -1082,8 +1144,11 @@ function newRun(st) {
   let n = 0; for (let c = 0; c < st.N; c++) if (st.playable[c]) { unrest[n] = c; pos[c] = n; n++; }
   const ch = G.chars[G.char], bonus = runBonus(), hp = 5 + bonus.charm;
   run = {
-    stage: st, t: 0, time: 0, kills: 0, ch, geo: heroGeo(ch.H), bonus, footCells: 0, footOn: FOOT.unlock <= 0,
-    p: { x: sx, y: sy + 3, hp, hpMax: hp, inv: 0, fireAt: -9, facing: -1, moving: false, kbx: 0, kby: 0, kbT: 0, healT: 0, inWater: false, still: 0, paintT: 0, paintN: 0, footR: 0 },
+    stage: st, t: 0, time: 0, kills: 0, ch, geo: heroGeo(ch.H), bonus,
+    p: { x: sx, y: sy + 3, hp, hpMax: hp, inv: 0, fireAt: -9, facing: -1, moving: false, kbx: 0, kby: 0, kbT: 0, healT: 0, inWater: false },
+    trail: { on: false, last: -1, prev: -1, cells: [], mark: new Uint8Array(st.N), pts: [] }, brushCells: 0, strokes: 0, caught: 0, cuts: 0, dries: 0, botPlan: null,
+    springs: placeSprings(st, sx, sy), sealed: 0, eroded: 0,
+    hue: new Int32Array(FAMS.length), hueLv: new Int8Array(FAMS.length), vineT: 4, shield: false, shieldT: 0,
     up: { blades: 0, rate: 0, dmg: 0, speed: 0, echo: 0, heart: 0, pierce: 0 },
     enemies: [], blades: [], parts: [], rings: [], queue: [],
     restored: new Uint8Array(st.N), queued: new Uint8Array(st.N), restoredPlayable: 0,
@@ -1093,6 +1158,31 @@ function newRun(st) {
     shake: 0, clearT: 0, cam: { x: 0, y: 0, w: 300, h: 300 },
   };
   computeCamera();
+}
+// 墨溜まり go to the darkest open ground (water counts as higher: blots born in water would just dissolve),
+// away from the start and from each other
+function placeSprings(st, sx, sy) {
+  const n = Math.max(0, Math.round(SPRING.count)), out = [], scx = Math.floor(sx / CELL), scy = Math.floor(sy / CELL), cand = [];
+  for (let c = 0; c < st.N; c++) {
+    if (!st.playable[c]) continue;
+    const x = c % st.CW, y = (c / st.CW) | 0;
+    if ((x - scx) ** 2 + (y - scy) ** 2 < 18 * 18) continue;
+    let open = true;
+    for (let dy = -1; dy <= 1 && open; dy++) for (let dx = -1; dx <= 1; dx++) {
+      const nx = x + dx, ny = y + dy;
+      if (nx < 0 || ny < 0 || nx >= st.CW || ny >= st.CH || !st.playable[ny * st.CW + nx]) { open = false; break; }
+    }
+    if (open) cand.push(c);
+  }
+  const key = (c) => st.height[c] + (st.terrain[c] === T_WATER ? 0.5 : 0);
+  cand.sort((a, b) => key(a) - key(b));
+  for (const c of cand) {
+    if (out.length >= n) break;
+    const x = c % st.CW, y = (c / st.CW) | 0;
+    if (out.some((q) => (q.cx - x) ** 2 + (q.cy - y) ** 2 < 14 * 14)) continue;
+    out.push({ c, cx: x, cy: y, x: (x + 0.5) * CELL, y: (y + 0.5) * CELL, hp: SPRING.hp, maxHp: SPRING.hp, dead: false, eat: SPRING.eatEvery, flash: 0 });
+  }
+  return out;
 }
 
 const pct = () => (run ? (run.restoredPlayable / run.stage.playableCount) * 100 : 0);
@@ -1111,6 +1201,7 @@ function applyRestore(c) {
     R.restoredPlayable++;
     const p = R.unrestPos[c];
     if (p >= 0) { const last = R.unrest[--R.unrestN]; R.unrest[p] = last; R.unrestPos[last] = p; R.unrestPos[c] = -1; }
+    if (st.fam[c] !== NOFAM) R.hue[st.fam[c]]++;
   }
   const ax = (c % st.CW) * 2, ay = ((c / st.CW) | 0) * 2, d = R.dImg.data;
   for (let dy = 0; dy < 2; dy++) for (let dx = 0; dx < 2; dx++) {
@@ -1120,11 +1211,29 @@ function applyRestore(c) {
   R.dirty = true;
   if (st.terrain[c] === T_WARM) { R.gImg.data.set([glowRGB[0], glowRGB[1], glowRGB[2], 255], c * 4); R.gDirty = true; R.glowAny = true; }
 }
+// ink takes a cell back: gray again, counted as unrestored, and a spawn point once more
+function applyUnrestore(c) {
+  const R = run, st = R.stage;
+  if (!R.restored[c]) return;
+  R.restored[c] = 0; R.queued[c] = 0;
+  if (st.playable[c]) {
+    R.restoredPlayable--;
+    R.unrestPos[c] = R.unrestN; R.unrest[R.unrestN++] = c;
+    if (st.fam[c] !== NOFAM) R.hue[st.fam[c]]--;
+  }
+  const ax = (c % st.CW) * 2, ay = ((c / st.CW) | 0) * 2, d = R.dImg.data;
+  for (let dy = 0; dy < 2; dy++) for (let dx = 0; dx < 2; dx++) {
+    const i = ((ay + dy) * st.AW + ax + dx) * 4;
+    d[i] = st.gray[i]; d[i + 1] = st.gray[i + 1]; d[i + 2] = st.gray[i + 2];
+  }
+  R.dirty = true;
+  if (st.terrain[c] === T_WARM) { R.gImg.data[c * 4 + 3] = 0; R.gDirty = true; }
+}
 function queueRestore(c, delay) {
   const R = run; R.queued[c] = 1;
   if (reduced) applyRestore(c); else R.queue.push({ c, at: R.time + delay });
 }
-function restoreAt(x, y, rad) {
+function restoreAt(x, y, rad, front) {
   const R = run, st = R.stage, cx = Math.floor(x / CELL), cy = Math.floor(y / CELL), lim = rad * rad + TUNE.discBias;
   let disc = 0, fresh = 0;
   for (let dy = -rad; dy <= rad; dy++) for (let dx = -rad; dx <= rad; dx++) {
@@ -1150,53 +1259,192 @@ function restoreAt(x, y, rad) {
     const n = Math.min(want, idx.length), far = n ? Math.sqrt(cand[idx[n - 1]]) || 1 : 1;
     for (let k = 0; k < n; k++) queueRestore(cand[idx[k] + 1], 0.12 + (Math.sqrt(cand[idx[k]]) / far) * 0.3);
   }
-  if (!reduced) R.rings.push({ x, y, r: (rad + 0.5) * CELL, t: 0, dur: 0.3, big: false });
+  if (!reduced) R.rings.push({ x, y, r: (rad + 0.5) * CELL, t: 0, dur: 0.3, big: false, front: !!front });
 }
 
-/* ── foot painting ── */
-const footCharge = () => Math.max(0.1, FOOT.charge * run.bonus.brush);
-// calls fn(cell, d²) for the disc of `rad` cells around the cell under her feet (rad 0 = that cell only)
-function footDisc(rad, fn) {
-  const R = run, st = R.stage, cx = Math.floor(R.p.x / CELL), cy = Math.floor(R.p.y / CELL), lim = rad ? rad * rad + TUNE.discBias : 0;
-  for (let dy = -rad; dy <= rad; dy++) for (let dx = -rad; dx <= rad; dx++) {
-    const d2 = dx * dx + dy * dy, nx = cx + dx, ny = cy + dy;
-    if (d2 > lim || nx < 0 || ny < 0 || nx >= st.CW || ny >= st.CH) continue;
-    if (fn(ny * st.CW + nx, d2) === false) return;
+/* ── 墨溜まり (ink springs) ── */
+function updateSprings(dt) {
+  const R = run, st = R.stage, reach = Math.max(1, Math.round(SPRING.reach));
+  const gray = (m) => st.playable[m] && !R.restored[m];
+  for (const s of R.springs) {
+    if (s.dead) continue;
+    if (s.flash > 0) s.flash -= dt;
+    s.eat -= dt;
+    if (s.eat > 0) continue;
+    s.eat += Math.max(0.05, SPRING.eatEvery);
+    // eat back the coloured cell nearest the spring that borders gray ground, so the ink creeps outward
+    let best = -1, bd = Infinity;
+    for (let dy = -reach; dy <= reach; dy++) for (let dx = -reach; dx <= reach; dx++) {
+      const d2 = dx * dx + dy * dy, x = s.cx + dx, y = s.cy + dy;
+      if (d2 > reach * reach || x < 0 || y < 0 || x >= st.CW || y >= st.CH) continue;
+      const c = y * st.CW + x;
+      if (!R.restored[c] || !st.playable[c]) continue;
+      if (!((x > 0 && gray(c - 1)) || (x < st.CW - 1 && gray(c + 1)) || (y > 0 && gray(c - st.CW)) || (y < st.CH - 1 && gray(c + st.CW)))) continue;
+      const k = d2 + Math.random() * 0.5;
+      if (k < bd) { bd = k; best = c; }
+    }
+    if (best < 0) continue;
+    applyUnrestore(best); R.eroded++;
+    R.parts.push({ x: ((best % st.CW) + 0.5) * CELL, y: (((best / st.CW) | 0) + 0.5) * CELL, vx: 0, vy: -10, life: 0.5, max: 0.5, kind: 'ink', s: 2 });
   }
 }
-function footFresh(rad) {
-  const R = run, st = R.stage; let any = false;
-  footDisc(rad, (c) => { if (st.playable[c] && !R.restored[c] && !R.queued[c]) { any = true; return false; } return true; });
-  return any;
+function hurtSpring(s, dmg) {
+  if (s.dead) return;
+  s.hp -= dmg; s.flash = 0.1;
+  if (s.hp <= 0) sealSpring(s); else sfx('hit', { vol: 0.6 });
 }
-// radius the next painting would use (it grows while she stands on), or -1 when nothing there is gray
-function footTarget() {
-  const P = run.p, lo = Math.max(0, Math.round(FOOT.radius)), hi = Math.max(lo, Math.round(FOOT.maxRadius)), grow = Math.max(0, Math.round(FOOT.grow));
-  const from = Math.min(hi, lo + P.paintN * grow), to = grow ? hi : from;
-  for (let r = from; r <= to; r++) if (footFresh(r)) return r;
-  return -1;
+function sealSpring(s) {
+  const R = run;
+  if (s.dead) return;
+  s.dead = true; R.sealed++;
+  restoreAt(s.x, s.y, 4);
+  for (const e of R.enemies) if (!e.dead && !e.boss && Math.hypot(e.x - s.x, e.y - s.y) < 48) purify(e);
+  burst(s.x, s.y, 16, 3);
+  if (!reduced) R.rings.push({ x: s.x, y: s.y, r: 6 * CELL, t: 0, dur: 0.8, big: true });
+  const left = R.springs.filter((q) => !q.dead).length;
+  showBanner(left ? `墨溜まりを封じた　残り ${left}` : 'すべての墨溜まりを封じた');
+  sfx('upgrade');
 }
-function paintFeet(rad) {
-  const R = run, st = R.stage, P = R.p;
-  footDisc(rad, (c, d2) => {
-    if (R.restored[c] || R.queued[c]) return;
-    if (st.playable[c]) R.footCells++;
-    queueRestore(c, (Math.sqrt(d2) / Math.max(1, rad)) * 0.3);
+// ink removed without its own restore ripple (it sat inside ground that is being restored anyway)
+function purify(e) {
+  if (e.dead) return;
+  e.dead = true; run.kills++;
+  burst(e.x, e.y, 4, 2);
+}
+// a kill near the edge of her colour (both colour and gray within 2 cells) pushes the colour further
+function onFrontier(x, y) {
+  const R = run, st = R.stage, cx = Math.floor(x / CELL), cy = Math.floor(y / CELL);
+  let col = false, gray = false;
+  for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
+    const nx = cx + dx, ny = cy + dy;
+    if (nx < 0 || ny < 0 || nx >= st.CW || ny >= st.CH) continue;
+    const c = ny * st.CW + nx;
+    if (!st.playable[c]) continue;
+    if (R.restored[c]) col = true; else gray = true;
+    if (col && gray) return true;
+  }
+  return false;
+}
+
+/* ── 筆で囲む (brush strokes) ── */
+const brushMax = () => Math.max(4, Math.round(BRUSH.maxLen + run.bonus.brush));
+const ownCell = (c) => run.restored[c] || run.queued[c];
+function clearTrail(T) {
+  for (const c of T.cells) T.mark[c] = 0;
+  T.cells.length = 0; T.pts.length = 0; T.on = false;
+}
+// every cell between two consecutive feet positions joins the line, so it never has gaps
+function addTrailCells(T, from, to) {
+  const st = run.stage, x0 = from % st.CW, y0 = (from / st.CW) | 0, x1 = to % st.CW, y1 = (to / st.CW) | 0;
+  const n = Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0));
+  for (let i = 1; i <= n; i++) {
+    const c = Math.round(y0 + ((y1 - y0) * i) / n) * st.CW + Math.round(x0 + ((x1 - x0) * i) / n);
+    if (!T.mark[c] && st.playable[c] && !ownCell(c)) { T.mark[c] = 1; T.cells.push(c); }
+  }
+}
+function updateTrail() {
+  const R = run, st = R.stage, P = R.p, T = R.trail, c = cellIndex(P.x, P.y);
+  if (pct() < BRUSH.unlock) { if (T.on) clearTrail(T); T.last = -1; return; }
+  if (ownCell(c)) {
+    if (T.on) closeTrail();
+    T.last = c; T.prev = c;
+    return;
+  }
+  if (!st.playable[c]) return;
+  if (!T.on) {
+    if (T.last < 0) return; // no colour behind her to start from
+    T.on = true; T.prev = T.last;
+    T.pts.push(((T.last % st.CW) + 0.5) * CELL, (((T.last / st.CW) | 0) + 0.5) * CELL);
+  }
+  if (c !== T.prev) { addTrailCells(T, T.prev, c); T.prev = c; }
+  const n = T.pts.length;
+  if (!n || Math.hypot(T.pts[n - 2] - P.x, T.pts[n - 1] - P.y) >= 3) T.pts.push(P.x, P.y);
+  if (T.cells.length > brushMax()) { // the brush ran dry: the line fades, start again from her colour
+    burst(P.x, P.y, 3, 1); clearTrail(T); T.last = -1; R.dries++;
+    say('筆が乾いた');
+  }
+}
+// a short line of text over her head (brush feedback)
+function say(text) { const R = run; R.parts.push({ x: R.p.x, y: R.p.y - R.geo.head - 6, vx: 0, vy: -10, life: 1.3, max: 1.3, kind: 'txt', s: 0, text }); }
+function cutTrail(x, y) {
+  const R = run, T = R.trail;
+  burst(x, y, 6, 2); sfx('hit', { vol: 0.7, pitch: -500 });
+  say('線が切られた'); R.cuts++;
+  if (!reduced) R.shake = Math.max(R.shake, 0.12);
+  clearTrail(T); T.last = -1;
+}
+// back on her colour: split the gray ground along the line (colour, walls and the line itself fence it),
+// keep the biggest side outside and fill every other pocket the line cut off, up to BRUSH.maxArea each
+function closeTrail() {
+  const R = run, st = R.stage, T = R.trail, N = st.N, CW = st.CW;
+  if (T.cells.length < BRUSH.minLen) { clearTrail(T); return; }
+  const comp = new Int32Array(N).fill(-1), q = new Int32Array(N), groups = [];
+  const open = (m) => m >= 0 && m < N && st.playable[m] && !ownCell(m) && !T.mark[m] && comp[m] < 0;
+  for (const t of T.cells) {
+    const tx = t % CW;
+    for (const m of [tx > 0 ? t - 1 : -1, tx < CW - 1 ? t + 1 : -1, t - CW, t + CW]) {
+      if (!open(m)) continue;
+      const id = groups.length, cells = []; let h = 0, tl = 0;
+      q[tl++] = m; comp[m] = id;
+      while (h < tl) {
+        const c = q[h++], x = c % CW; cells.push(c);
+        for (const k of [x > 0 ? c - 1 : -1, x < CW - 1 ? c + 1 : -1, c - CW, c + CW]) if (open(k)) { comp[k] = id; q[tl++] = k; }
+      }
+      groups.push(cells);
+    }
+  }
+  let biggest = -1;
+  groups.forEach((g, i) => { if (biggest < 0 || g.length > groups[biggest].length) biggest = i; });
+  const fill = T.cells.slice();
+  let tooBig = false;
+  groups.forEach((g, i) => {
+    if (i === biggest) return;
+    if (g.length > BRUSH.maxArea) { tooBig = true; return; }
+    for (const c of g) fill.push(c);
   });
-  if (!reduced) R.rings.push({ x: (Math.floor(P.x / CELL) + 0.5) * CELL, y: (Math.floor(P.y / CELL) + 0.5) * CELL, r: (rad + 0.5) * CELL, t: 0, dur: 0.45, big: false, wet: true });
-  sfx('restore', { vol: 0.7 });
+  const mark = new Uint8Array(N);
+  let fresh = 0, sx = 0, sy = 0;
+  fill.forEach((c, i) => {
+    mark[c] = 1; sx += c % CW; sy += (c / CW) | 0;
+    if (ownCell(c)) return;
+    if (st.playable[c]) fresh++;
+    queueRestore(c, 0.04 + (i / fill.length) * 0.45);
+  });
+  R.brushCells += fresh; R.strokes++;
+  // ink caught inside is purified; a 墨溜まり inside (or under the line) is sealed
+  let caught = 0;
+  for (const e of R.enemies) if (!e.dead && !e.boss && mark[cellIndex(e.x, e.y)]) { purify(e); caught++; }
+  R.caught += caught;
+  for (const s of R.springs) if (!s.dead && mark[s.c]) sealSpring(s);
+  const cx = (sx / fill.length + 0.5) * CELL, cy = (sy / fill.length + 0.5) * CELL;
+  if (!reduced) R.rings.push({ x: cx, y: cy, r: Math.sqrt(fill.length) * CELL * 0.7, t: 0, dur: 0.6, big: false, wet: true });
+  if (fresh >= 10) R.parts.push({ x: cx, y: cy - 6, vx: 0, vy: -14, life: 1.2, max: 1.2, kind: 'txt', s: 0, text: caught ? `${fresh}マス・墨×${caught}` : `${fresh}マス` });
+  if (tooBig) say('広すぎて囲めない');
+  sfx('restore'); if (caught) sfx('kill');
+  clearTrail(T);
 }
-function resetFoot(P) { P.still = 0; P.paintT = 0; P.paintN = 0; }
-function updateFoot(dt) {
-  const P = run.p;
-  if (!run.footOn || P.moving || P.kbT > 0) { resetFoot(P); return; }
-  P.still += dt;
-  if (P.still < FOOT.delay) return;
-  const rad = footTarget();
-  if (rad < 0) { P.paintT = 0; return; } // everything in reach is already coloured
-  P.footR = rad;
-  P.paintT += dt;
-  if (P.paintT >= footCharge()) { P.paintT = 0; paintFeet(rad); P.paintN++; }
+
+/* ── 色の力 (colour powers) ── */
+const hueLv = (f) => run.hueLv[f];
+function updateHue(dt) {
+  const R = run, P = R.p;
+  for (let f = 0; f < FAMS.length; f++) {
+    let lv = 0;
+    while (lv < HUE_LV.length && R.hue[f] >= HUE_LV[lv] * HUE.scale) lv++;
+    if (lv > R.hueLv[f]) { R.hueLv[f] = lv; showBanner(`${FAMS[f].name}の力 Lv${lv}`); sfx('heal'); }
+  }
+  // 緑: every few seconds vines hold the nearest ink in place
+  const g = hueLv(F_MIDORI);
+  if (g && (R.vineT -= dt) <= 0) {
+    R.vineT = Math.max(2.5, 7 - 0.9 * g);
+    const by = P.y - R.geo.mid;
+    R.enemies.filter((e) => !e.dead && !e.boss && Math.hypot(e.x - P.x, e.y - by) < 110)
+      .sort((a, b) => Math.hypot(a.x - P.x, a.y - by) - Math.hypot(b.x - P.x, b.y - by))
+      .slice(0, 1 + g).forEach((e) => { e.rootT = 1.2 + 0.2 * g; });
+  }
+  // 白: a paper shield refills while she has none
+  const w = hueLv(F_SHIRO);
+  if (w && !R.shield && (R.shieldT += dt) >= Math.max(6, 16 - 2 * w)) { R.shield = true; R.shieldT = 0; }
 }
 function processQueue() {
   const R = run; if (!R.queue.length) return;
@@ -1239,6 +1487,7 @@ function movePlayer(dx, dy) {
 }
 
 function readInput() {
+  if (G.forceInput) return G.forceInput;
   if (G.bot) return botInput();
   let x = 0, y = 0;
   if (joy.active) {
@@ -1289,7 +1538,14 @@ function spawnOne() {
   const wB = t >= 120 ? 0.1 + 0.1 * Math.min(1, (t - 120) / 120) : 0;
   const roll = Math.random() * (1 + wW + wB);
   if (roll > 1 + wW) type = 'big'; else if (roll > 1) type = 'wisp';
-  const pos = findSpawn(150, 260, true) || findSpawn(90, Infinity, false);
+  // part of the ink wells up from a living 墨溜まり (not one right next to her)
+  const P = run.p, wells = run.springs.filter((q) => !q.dead && Math.hypot(q.x - P.x, q.y - P.y) > 90);
+  let pos = null;
+  if (wells.length && Math.random() < SPRING.spawnShare) {
+    const q = wells[(Math.random() * wells.length) | 0], a = Math.random() * Math.PI * 2;
+    pos = { x: q.x + Math.cos(a) * 6, y: q.y + Math.sin(a) * 6 };
+  }
+  pos = pos || findSpawn(150, 260, true) || findSpawn(90, Infinity, false);
   if (pos) addEnemy(type, pos.x, pos.y);
 }
 function spawnBoss() {
@@ -1312,6 +1568,8 @@ function fire() {
   const R = run, P = R.p, ox = P.x, oy = P.y - R.geo.fan;
   let best = null, bd = Infinity;
   for (const e of R.enemies) { if (e.dead) continue; const d = (e.x - ox) ** 2 + (e.y - oy) ** 2; if (d < bd) { bd = d; best = e; } }
+  // no ink close by: aim at a 墨溜まり in reach
+  if (bd > 110 * 110) for (const q of R.springs) { if (q.dead) continue; const d = (q.x - ox) ** 2 + (q.y - oy) ** 2; if (d < 140 * 140 && d < bd) { bd = d; best = q; } }
   const ang = best ? Math.atan2(best.y - oy, best.x - ox) : (P.facing > 0 ? 0 : Math.PI);
   P.fireAt = R.time; sfx('fan');
   const n = 3 + R.up.blades, spread = ((36 + (n - 3) * 10) * Math.PI) / 180;
@@ -1338,13 +1596,16 @@ function killEnemy(e) {
   if (!e.boss) sfx('kill');
   burst(e.x, e.y, e.boss ? 24 : e.r > 6 ? 9 : 5, e.boss ? 3 : 2);
   if (e.boss) { bossDefeated(e); return; }
-  restoreAt(e.x, e.y, e.rr + R.up.echo);
+  const front = TUNE.frontier > 0 && onFrontier(e.x, e.y);
+  restoreAt(e.x, e.y, e.rr + R.up.echo + (front ? Math.round(TUNE.frontier) : 0), front);
   sfx('restore');
 }
 function bossDefeated(b) {
   const R = run, st = R.stage;
   for (const e of R.enemies) if (!e.dead) { e.dead = true; burst(e.x, e.y, 4, 2); }
   R.boss = null;
+  for (const q of R.springs) q.dead = true;
+  clearTrail(R.trail);
   let maxD = 1;
   const pts = [];
   for (let c = 0; c < st.N; c++) {
@@ -1365,8 +1626,13 @@ function bossDefeated(b) {
 function hitPlayer(src) {
   const R = run, P = R.p;
   if (G.god) { P.inv = 1; return; }
+  if (R.shield) { // 白: the paper shield takes the hit
+    R.shield = false; P.inv = 0.6; sfx('click');
+    for (let i = 0; i < 8; i++) { const a = (i / 8) * Math.PI * 2; R.parts.push({ x: P.x, y: P.y - R.geo.mid, vx: Math.cos(a) * 50, vy: Math.sin(a) * 50, life: 0.4, max: 0.4, kind: 'paper', s: 2 }); }
+    return;
+  }
   P.hp--; P.inv = 1.0;
-  resetFoot(P); // a hit breaks the foot-painting charge
+  if (R.trail.on) cutTrail(P.x, P.y);
   sfx('hurt');
   const dx = P.x - src.x, dy = P.y - R.geo.mid - src.y, d = Math.hypot(dx, dy) || 1;
   P.kbx = (dx / d) * 150; P.kby = (dy / d) * 150; P.kbT = 0.15;
@@ -1393,7 +1659,7 @@ function update(dt) {
   if (Math.abs(ix) > 0.1) P.facing = ix > 0 ? 1 : -1;
   const c0 = cellIndex(P.x, P.y);
   P.inWater = st.terrain[c0] === T_WATER;
-  const spd = BASE_SPEED * R.bonus.zori * (1 + 0.15 * R.up.speed) * (P.inWater ? 0.55 : 1);
+  const spd = BASE_SPEED * R.bonus.zori * (1 + 0.15 * R.up.speed) * (P.inWater ? 0.55 : 1) * (R.trail.on ? BRUSH.speed : 1);
   let mx = ix * spd * dt, my = iy * spd * dt;
   if (P.kbT > 0) { mx += P.kbx * dt; my += P.kby * dt; P.kbT -= dt; }
   if (mx || my) movePlayer(mx, my);
@@ -1415,7 +1681,9 @@ function update(dt) {
     return;
   }
 
-  updateFoot(dt);
+  updateTrail();
+  updateSprings(dt);
+  updateHue(dt);
 
   // ── weapon ──
   R.fireT -= dt;
@@ -1428,14 +1696,29 @@ function update(dt) {
 
   // ── enemies ──
   const tx = P.x, ty = P.y - R.geo.mid, E = R.enemies;
+  const poison = 0.4 * hueLv(F_MURASAKI), poisonR = 26 + 4 * hueLv(F_MURASAKI);
   for (const e of E) {
     if (e.dead) continue;
     if (e.spawnT > 0) e.spawnT -= dt;
     if (e.flash > 0) e.flash -= dt;
     const dx = tx - e.x, dy = ty - e.y, d = Math.hypot(dx, dy) || 1;
-    const sp = e.spawnT > 0 ? e.spd * 0.3 : e.spd;
+    let sp = e.spawnT > 0 ? e.spd * 0.3 : e.spd;
+    if (e.slowT > 0) { e.slowT -= dt; sp *= e.boss ? (1 + e.slowMul) / 2 : e.slowMul; }
+    if (e.rootT > 0) { e.rootT -= dt; sp = 0; }
     e.vx = (dx / d) * sp; e.vy = (dy / d) * sp;
-    e.x += e.vx * dt; e.y += e.vy * dt;
+    let nx = e.x + e.vx * dt, ny = e.y + e.vy * dt;
+    const cutter = e.boss || (ENEMY[e.type] && ENEMY[e.type].cuts);
+    // the brush line is a fence for small ink: it slides along the line instead of crossing it
+    if (R.trail.on && !cutter && R.trail.mark[cellIndex(nx, ny)] && !R.trail.mark[cellIndex(e.x, e.y)]) {
+      if (!R.trail.mark[cellIndex(nx, e.y)]) ny = e.y; else if (!R.trail.mark[cellIndex(e.x, ny)]) nx = e.x; else { nx = e.x; ny = e.y; }
+    }
+    e.x = nx; e.y = ny;
+    // 朱 burn and 紫 poison tick as damage over time
+    let dot = 0;
+    if (e.burnT > 0) { e.burnT -= dt; dot += e.burnDps; if (Math.random() < dt * 8) R.parts.push({ x: e.x + (Math.random() - 0.5) * e.r, y: e.y - e.r * 0.5, vx: 0, vy: -24, life: 0.35, max: 0.35, kind: 'fire', s: 1 }); }
+    if (poison && d < poisonR + e.r) dot += poison;
+    if (dot) { e.dot = (e.dot || 0) + dot * dt; if (e.dot >= 1) { e.dot -= 1; hurtEnemy(e, 1); if (e.dead) continue; } }
+    if (R.trail.on && cutter && e.spawnT <= 0 && R.trail.mark[cellIndex(e.x, e.y)]) cutTrail(e.x, e.y);
     if (!e.boss) {
       e.inWater = st.terrain[cellIndex(e.x, e.y)] === T_WATER;
       if (e.inWater) { e.wT += dt; if (e.wT >= 1) { e.wT -= 1; hurtEnemy(e, 1); if (e.dead) continue; } } else e.wT = 0;
@@ -1464,7 +1747,7 @@ function update(dt) {
   }
 
   // ── blades ──
-  const B = R.blades;
+  const B = R.blades, kin = hueLv(F_KIN), shu = hueLv(F_SHU), ai = hueLv(F_AI);
   for (const b of B) {
     b.tr.unshift(b.x, b.y); if (b.tr.length > 6) b.tr.length = 6;
     b.x += b.vx * dt; b.y += b.vy * dt; b.life -= dt;
@@ -1476,8 +1759,17 @@ function update(dt) {
       if (b.hit.includes(e.id)) continue;
       b.hit.push(e.id);
       if (!e.boss) { e.x += b.vx * 0.025; e.y += b.vy * 0.025; }
-      hurtEnemy(e, b.dmg);
+      const crit = kin && Math.random() < 0.06 * kin;
+      if (crit) for (let i = 0; i < 4; i++) R.parts.push({ x: e.x, y: e.y, vx: (Math.random() - 0.5) * 90, vy: (Math.random() - 0.5) * 90, life: 0.3, max: 0.3, kind: 'gold', s: 1 });
+      hurtEnemy(e, crit ? b.dmg * 2 : b.dmg);
+      if (!e.dead && shu) { e.burnT = 2; e.burnDps = 0.5 * shu; }
+      if (!e.dead && ai) { e.slowT = 1.5; e.slowMul = 1 - Math.min(0.5, 0.1 * ai); }
       if (--b.pierce <= 0) { b.life = 0; break; }
+    }
+    if (b.life > 0) for (let si = 0; si < R.springs.length; si++) {
+      const q = R.springs[si];
+      if (q.dead || b.hit.includes(-1 - si) || (q.x - b.x) ** 2 + (q.y - b.y) ** 2 > 110) continue;
+      b.hit.push(-1 - si); hurtSpring(q, b.dmg);
     }
   }
   R.blades = B.filter((b) => b.life > 0);
@@ -1490,7 +1782,6 @@ function update(dt) {
   const p = pct();
   while (R.nextThr < THRESHOLDS.length && p >= THRESHOLDS[R.nextThr]) { R.nextThr++; R.pendingUp++; }
   if (R.pendingUp > 0) { openUpgrade(); return; }
-  if (!R.footOn && p >= FOOT.unlock) { R.footOn = true; if (FOOT.unlock > 0) showBanner('足元に色がにじむ'); }
   if (!R.bossSpawned && p >= TUNE.bossAt) spawnBoss();
 }
 function updateParticles(dt) {
@@ -1504,15 +1795,47 @@ function updateParticles(dt) {
 /* ── autopilot used only by the debug hook (pacing checks) ── */
 function botInput() {
   const R = run, st = R.stage, P = R.p;
-  // "stand" bot: stays put to let her feet colour the ground whenever no ink is close
-  if (G.botStand && R.footOn && footTarget() >= 0 && !R.enemies.some((e) => Math.hypot(e.x - P.x, e.y - (P.y - R.geo.mid)) < 64 + e.r)) return [0, 0];
-  let tx = P.x, ty = P.y, bd = Infinity;
-  for (let k = 0; k < R.unrestN; k += 1) {
-    const c = R.unrest[k], x = ((c % st.CW) + 0.5) * CELL, y = (((c / st.CW) | 0) + 0.5) * CELL, d = (x - P.x) ** 2 + (y - P.y) ** 2;
-    if (d < bd) { bd = d; tx = x; ty = y; }
+  let tx = P.x, ty = P.y, bd = Infinity, pull = 1;
+  // "loop" bot: from its colour it walks ~8 cells out into the gray, turns, and comes home to close the line
+  // (as a person drawing small loops would); with no plan left it walks up to a nearby 墨溜まり
+  const T = R.trail, here = cellIndex(P.x, P.y);
+  if (G.botLoop && !T.on && ownCell(here) && (!R.botPlan || R.botPlan.i >= 2)) {
+    let gx = 0, gy = 0, gd = Infinity;
+    for (let k = 0; k < R.unrestN; k++) {
+      const c = R.unrest[k], x = ((c % st.CW) + 0.5) * CELL, y = (((c / st.CW) | 0) + 0.5) * CELL, d = (x - P.x) ** 2 + (y - P.y) ** 2;
+      if (d < gd) { gd = d; gx = x - P.x; gy = y - P.y; }
+    }
+    const m = Math.hypot(gx, gy) || 1, ux = gx / m, uy = gy / m, L = 8 * CELL, side = Math.random() < 0.5 ? 1 : -1;
+    R.botPlan = { pts: [[P.x + ux * L, P.y + uy * L], [P.x + ux * L - uy * L * side, P.y + uy * L + ux * L * side]], i: 0, at: R.time };
+  }
+  if (G.botLoop && R.botPlan && R.botPlan.i < 2 && (T.on || ownCell(here))) {
+    const w = R.botPlan.pts[R.botPlan.i];
+    // a waypoint behind a wall, or a plan taking too long, is given up: head home instead
+    if (R.time - R.botPlan.at > 4 || solidCell(Math.floor(w[0] / CELL), Math.floor(w[1] / CELL))) R.botPlan.i = 2;
+    else if (Math.hypot(w[0] - P.x, w[1] - P.y) < 6) R.botPlan.i++;
+    else { tx = w[0]; ty = w[1]; bd = 0; }
+  }
+  if (G.botLoop && bd === Infinity && (T.on || !ownCell(here))) {
+    const pcx = Math.floor(P.x / CELL), pcy = Math.floor(P.y / CELL);
+    for (let dy = -24; dy <= 24; dy++) for (let dx = -24; dx <= 24; dx++) {
+      const x = pcx + dx, y = pcy + dy;
+      if (x < 0 || y < 0 || x >= st.CW || y >= st.CH || !R.restored[y * st.CW + x]) continue;
+      const d = dx * dx + dy * dy; if (d < bd) { bd = d; tx = (x + 0.5) * CELL; ty = (y + 0.5) * CELL; }
+    }
+  }
+  if (bd === Infinity && G.botLoop) {
+    for (const q of R.springs) { if (q.dead) continue; const d = (q.x - P.x) ** 2 + (q.y - P.y) ** 2; if (d < 170 * 170 && d < bd) { bd = d; tx = q.x; ty = q.y; } }
+    if (bd < Infinity) pull = bd < 50 * 50 ? 0 : 0.8;
+  }
+  if (bd === Infinity) {
+    for (let k = 0; k < R.unrestN; k += 1) {
+      const c = R.unrest[k], x = ((c % st.CW) + 0.5) * CELL, y = (((c / st.CW) | 0) + 0.5) * CELL, d = (x - P.x) ** 2 + (y - P.y) ** 2;
+      if (d < bd) { bd = d; tx = x; ty = y; }
+    }
+    pull = bd < 60 * 60 ? 0.3 : 1;
   }
   let vx = tx - P.x, vy = ty - P.y; const d0 = Math.hypot(vx, vy) || 1;
-  const pull = bd < 60 * 60 ? 0.3 : 1; vx = (vx / d0) * pull; vy = (vy / d0) * pull;
+  vx = (vx / d0) * pull; vy = (vy / d0) * pull;
   for (const e of R.enemies) {
     const dx = P.x - e.x, dy = P.y - R.geo.mid - e.y, d = Math.hypot(dx, dy) || 1, lim = 46 + e.r;
     if (d < lim) { const w = ((lim - d) / lim) * 3; vx += (dx / d) * w; vy += (dy / d) * w; }
@@ -1596,26 +1919,53 @@ function render() {
   }
   L.globalAlpha = 1;
 
-  // restore ripples (foot painting leaves a celadon "wet" ring)
+  // 墨溜まり: dark pools with ripples spreading out; a vermilion arc shows the damage done
+  for (const q of R.springs) {
+    if (q.dead) continue;
+    L.globalAlpha = 0.92; L.fillStyle = q.flash > 0 ? C.blobRim : C.ink;
+    L.beginPath(); L.ellipse(q.x, q.y, 10, 8, 0, 0, Math.PI * 2); L.fill();
+    L.strokeStyle = C.blobRim; L.lineWidth = 1;
+    for (let i = 0; i < 2; i++) {
+      const u = (R.time * 0.6 + i * 0.5 + q.cx * 0.13) % 1;
+      L.globalAlpha = (1 - u) * 0.7;
+      L.beginPath(); L.ellipse(q.x, q.y, 5 + u * 10, 4 + u * 8, 0, 0, Math.PI * 2); L.stroke();
+    }
+    if (q.hp < q.maxHp) {
+      L.globalAlpha = 0.95; L.strokeStyle = C.shu; L.lineWidth = 2;
+      L.beginPath(); L.arc(q.x, q.y, 14, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * Math.max(0, q.hp / q.maxHp)); L.stroke();
+    }
+  }
+  L.globalAlpha = 1;
+
+  // restore ripples: gold when the kill pushed the edge of her colour, celadon for brush strokes
   for (const r of R.rings) {
     const u = r.t / r.dur, rad = r.r * (r.big ? u : 0.3 + 0.7 * u);
     L.globalAlpha = (1 - u) * (r.big ? 0.9 : 0.75);
-    L.strokeStyle = r.big ? C.gold : r.wet ? C.celadon : C.paper; L.lineWidth = r.big ? 3 : 1.5;
+    L.strokeStyle = r.big || r.front ? C.gold : r.wet ? C.celadon : C.paper; L.lineWidth = r.big ? 3 : 1.5;
     L.beginPath(); L.arc(r.x, r.y, Math.max(0.5, rad), 0, Math.PI * 2); L.stroke();
   }
   L.globalAlpha = 1;
 
-  // foot-painting gauge: the disc about to take colour, filling while she stands still
-  if (P.paintT > 0 && G.state === 'play') {
-    const u = Math.min(1, P.paintT / footCharge()), r = (P.footR + 0.5) * CELL;
-    const fx0 = (Math.floor(P.x / CELL) + 0.5) * CELL, fy0 = (Math.floor(P.y / CELL) + 0.5) * CELL;
-    L.globalAlpha = 0.1 + 0.25 * u; L.fillStyle = C.celadon;
-    L.beginPath(); L.arc(fx0, fy0, Math.max(1, r * u), 0, Math.PI * 2); L.fill();
-    L.globalAlpha = 0.45; L.strokeStyle = C.paper; L.lineWidth = 1;
-    L.beginPath(); L.arc(fx0, fy0, r, 0, Math.PI * 2); L.stroke();
-    L.globalAlpha = 0.95; L.strokeStyle = C.gold; L.lineWidth = 2;
-    L.beginPath(); L.arc(fx0, fy0, r, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * u); L.stroke();
+  // 紫: the poison aura around her
+  const pz = hueLv(F_MURASAKI);
+  if (pz && G.state === 'play') {
+    L.globalAlpha = 0.16 + 0.05 * Math.sin(R.time * 3); L.strokeStyle = C.murasaki; L.lineWidth = 1;
+    L.beginPath(); L.arc(P.x, P.y - R.geo.mid, 26 + 4 * pz, 0, Math.PI * 2); L.stroke();
     L.globalAlpha = 1;
+  }
+
+  // brush line: from where she left her colour to her feet, reddening as the brush runs dry
+  const T = R.trail;
+  if (T.on && T.pts.length >= 2) {
+    const u = T.cells.length / brushMax();
+    const path = () => { L.beginPath(); L.moveTo(T.pts[0], T.pts[1]); for (let j = 2; j < T.pts.length; j += 2) L.lineTo(T.pts[j], T.pts[j + 1]); L.lineTo(P.x, P.y); };
+    L.lineCap = 'round'; L.lineJoin = 'round';
+    L.globalAlpha = 0.45; L.strokeStyle = C.ink; L.lineWidth = 4; path(); L.stroke();
+    L.globalAlpha = 0.95; L.strokeStyle = u > 0.75 ? C.shu : C.celadon; L.lineWidth = 2; path(); L.stroke();
+    // what is left in the brush, as an arc at her feet
+    L.globalAlpha = 0.9; L.strokeStyle = u > 0.75 ? C.shu : C.gold; L.lineWidth = 1.5;
+    L.beginPath(); L.arc(P.x, P.y, 9, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * Math.max(0, 1 - u)); L.stroke();
+    L.globalAlpha = 1; L.lineCap = 'butt'; L.lineJoin = 'miter';
   }
 
   // blit the low-res world to the screen, crisp, with sub-pixel camera offset
@@ -1654,15 +2004,44 @@ function render() {
   g.globalAlpha = 1;
 
   // particles
+  const PCOL = { hit: C.peony, fire: C.glowWarm, gold: C.gold, paper: C.paper };
   for (const q of R.parts) {
     const u = q.life / q.max;
+    if (q.kind === 'txt') continue; // drawn below in device pixels
     if (q.kind === 'plus') { g.globalAlpha = Math.min(1, u * 2); g.drawImage(SPR.plus, Math.round(q.x - 2), Math.round(q.y)); continue; }
     g.globalAlpha = Math.min(1, u * 1.6);
-    g.fillStyle = q.kind === 'hit' ? C.peony : (Math.random() < 0.2 ? C.blobRim : C.blob);
+    g.fillStyle = PCOL[q.kind] || (Math.random() < 0.2 ? C.blobRim : C.blob);
     g.fillRect(Math.round(q.x), Math.round(q.y), q.s, q.s);
   }
   g.globalAlpha = 1;
   g.setTransform(1, 0, 0, 1, 0, 0);
+
+  // floating text (brush catches) at screen resolution
+  ctx.font = `${Math.round(13 * view.dpr)}px ${FONT_DOT}`;
+  ctx.textAlign = 'center'; ctx.lineWidth = 3 * view.dpr; ctx.strokeStyle = C.ink; ctx.fillStyle = C.paper;
+  for (const q of R.parts) {
+    if (q.kind !== 'txt') continue;
+    const x = q.x * k + view.ox, y = q.y * k + view.oy;
+    ctx.globalAlpha = Math.min(1, (q.life / q.max) * 2.5);
+    ctx.strokeText(q.text, x, y); ctx.fillText(q.text, x, y);
+  }
+  ctx.globalAlpha = 1; ctx.textAlign = 'start';
+
+  // 墨溜まり off screen: a small ink arrow at the screen edge points to each one
+  for (const q of R.springs) {
+    if (q.dead) continue;
+    const m = 14 * view.dpr, top = view.hudDev + m, sx = q.x * k + view.ox, sy = q.y * k + view.oy;
+    if (sx > m && sx < cv.width - m && sy > top && sy < cv.height - m) continue;
+    const cx2 = cv.width / 2, cy2 = (top + cv.height - m) / 2, ang = Math.atan2(sy - cy2, sx - cx2);
+    const hw = cv.width / 2 - m, hh = (cv.height - m - top) / 2;
+    const t = Math.min(hw / Math.max(1e-6, Math.abs(Math.cos(ang))), hh / Math.max(1e-6, Math.abs(Math.sin(ang))));
+    const r = 5 * view.dpr;
+    ctx.save(); ctx.translate(cx2 + Math.cos(ang) * t, cy2 + Math.sin(ang) * t); ctx.rotate(ang);
+    ctx.globalAlpha = 0.9; ctx.fillStyle = C.ink; ctx.strokeStyle = C.blobThinRim; ctx.lineWidth = 1.5 * view.dpr;
+    ctx.beginPath(); ctx.moveTo(r * 2.2, 0); ctx.lineTo(-r, -r * 1.3); ctx.lineTo(-r, r * 1.3); ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.restore();
+  }
+  ctx.globalAlpha = 1;
 
   // floating joystick
   if (joy.active) {
@@ -1682,6 +2061,11 @@ let heroFrame = 'w0';
 function drawPlayer(g) {
   const R = run, P = R.p, CH = R.ch;
   g.drawImage(SPR.shadow, Math.round(P.x - 7), Math.round(P.y - 3));
+  if (R.shield) {
+    g.globalAlpha = 0.5 + 0.15 * Math.sin(R.time * 4); g.strokeStyle = C.paper; g.lineWidth = 1;
+    g.beginPath(); g.ellipse(P.x, P.y - R.geo.mid, R.geo.mid * 0.75, R.geo.mid * 1.2, 0, 0, Math.PI * 2); g.stroke();
+    g.globalAlpha = 1;
+  }
   if (P.inv > 0 && P.inv < 0.88 && G.state === 'play' && Math.floor(P.inv * 14) % 2 === 0) return; // blink
   const since = R.time - P.fireAt, swing = since >= 0 && since < ATK_F0 + ATK_F1;
   const white = P.inv > 0.88 && G.state === 'play';
@@ -1724,7 +2108,7 @@ function drawPlayer(g) {
 
 function drawEnemy(g, e) {
   const R = run, set = SPR.blob[e.boss ? 18 : e.r];
-  const v = e.flash > 0 ? set.f : (e.inWater ? set.t : set.n);
+  const v = e.flash > 0 ? set.f : (e.inWater || e.slowT > 0 ? set.t : set.n);
   const fi = Math.floor(R.time * 6 + e.seed * 10) % 6, spr = v.frames[fi], s = v.size;
   const bob = Math.round(Math.sin(R.time * 3 + e.seed) * (e.boss ? 2 : 1));
   const a = e.spawnT > 0 ? Math.max(0, 1 - e.spawnT / (e.boss ? 0.8 : 0.4)) : 1;
@@ -1738,6 +2122,11 @@ function drawEnemy(g, e) {
   }
   g.globalAlpha = a;
   g.drawImage(spr, Math.round(e.x - s / 2), Math.round(e.y - s / 2 + bob));
+  if (e.rootT > 0) { // 緑: vines around its foot
+    g.fillStyle = C.midori;
+    g.fillRect(Math.round(e.x - e.r), Math.round(e.y + e.r - 1), 2, 3); g.fillRect(Math.round(e.x + e.r - 2), Math.round(e.y + e.r - 1), 2, 3);
+    g.fillRect(Math.round(e.x - e.r + 1), Math.round(e.y + e.r + 1), Math.round(e.r * 2 - 2), 1);
+  }
   g.globalAlpha = 1;
 }
 
@@ -1750,7 +2139,7 @@ function showScreen(name) {
   if (name === 'game') resize();
 }
 
-const hudCache = { hp: -1, hpMax: -1, clock: '', pct: -1, retreat: null, boss: -1, sub: null };
+const hudCache = { hp: -1, hpMax: -1, clock: '', pct: -1, retreat: null, boss: -1, sub: null, pw: null, spr: -1 };
 function updateHud() {
   const R = run; if (!R) return;
   const P = R.p;
@@ -1781,7 +2170,26 @@ function updateHud() {
     $('bossbar').hidden = bossFrac < 0;
     if (bossFrac >= 0) $('bossfill').style.width = `${bossFrac * 100}%`;
   }
-  const sub = showRetreat || bossFrac >= 0;
+  // colour powers reached, and the paper shield when it is ready
+  const pwKey = R.hueLv.join(',') + (R.shield ? 's' : '');
+  if (pwKey !== hudCache.pw) {
+    hudCache.pw = pwKey;
+    const box = $('hudPw'); box.textContent = '';
+    const chip = (col, name, lv, title) => {
+      const c = document.createElement('span'); c.className = 'pwc'; c.style.setProperty('--c', col); c.title = title;
+      c.innerHTML = '<i></i><span></span>' + (lv ? `<b>${lv}</b>` : '');
+      c.children[1].textContent = name; box.appendChild(c);
+    };
+    FAMS.forEach((f, i) => { if (R.hueLv[i]) chip(f.col, f.name, R.hueLv[i], f.power); });
+    if (R.shield) chip(C.paper, '紙の盾', 0, '次の被弾を1回防ぐ');
+    box.hidden = !box.children.length;
+  }
+  const left = R.springs.reduce((n, q) => n + (q.dead ? 0 : 1), 0);
+  if (left !== hudCache.spr) {
+    hudCache.spr = left;
+    $('sprInfo').hidden = !left; $('sprInfo').innerHTML = `墨溜まり <b>${'●'.repeat(left)}</b>`;
+  }
+  const sub = showRetreat || bossFrac >= 0 || left > 0;
   if (sub !== hudCache.sub) { hudCache.sub = sub; $('hudSub').hidden = !sub; }
 }
 
@@ -1829,10 +2237,28 @@ function chooseUpgrade(i) {
   else if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
 }
 
+/* ── 色の力 list (pause screen) ── */
+function renderPowers(box) {
+  const R = run, st = R.stage;
+  box.textContent = '';
+  FAMS.forEach((f, i) => {
+    if (!st.famCount[i]) return;
+    const lv = R.hueLv[i], next = lv < HUE_LV.length ? Math.ceil(HUE_LV[lv] * HUE.scale) : 0;
+    const li = document.createElement('li');
+    li.innerHTML = '<i class="sw"></i><span></span><span></span><span class="pv"></span>';
+    li.children[0].style.background = f.col;
+    li.children[1].textContent = `${f.name} Lv${lv}`;
+    li.children[2].textContent = f.power;
+    li.children[3].textContent = next ? `${Math.max(0, R.hue[i])}/${next}マス` : '最大';
+    box.appendChild(li);
+  });
+}
+
 /* ── pause ── */
 function pause() {
   if (G.state !== 'play') return;
   G.state = 'paused'; joy.active = false; keys.clear();
+  renderPowers($('pzPw'));
   $('pauseOv').classList.add('on'); $('resumeBtn').focus({ preventScroll: true });
 }
 function resume() {
@@ -1867,6 +2293,8 @@ function endRun(kind) {
   // 香料: 1 per % restored, +30 for a clear; a fall keeps only part of it (風呂敷 raises that share)
   const earned = G.bot ? 0 : Math.floor((p + (kind === 'clear' ? 30 : 0)) * (kind === 'death' ? R.bonus.cloth : 1));
   if (earned > 0) { META.koryo += earned; saveMeta(); }
+  const pw = FAMS.map((f, i) => (R.hueLv[i] ? `${f.name} Lv${R.hueLv[i]}` : '')).filter(Boolean);
+  $('rPw').innerHTML = pw.length ? `色の力　<b>${pw.join('・')}</b>　墨溜まり <b>${R.sealed}/${R.springs.length}</b> 封印` : '';
   $('rEarn').innerHTML = earned > 0 ? `${CURRENCY} <b>+${earned}</b>　所持 <b>${META.koryo}</b>　（タイトルの工房で使える）` : '';
   // result UI
   const T = { clear: ['彩、還る。', '大墨を祓い、すべての色が還った。'], retreat: ['撤収', '取り戻した色を持ち帰った。記録はそのまま残る。'], death: ['墨に呑まれた', '倒れてしまった。記録は半分になる。'] }[kind];
@@ -1906,12 +2334,15 @@ function renderPreview() {
   const legend = $('legend'); legend.textContent = '';
   if (!st) {
     $('pvName').textContent = G.selected === 'upload' ? '画像からつくる' : '準備中…';
+    $('pvPw').textContent = '';
     const tm = $('tmap'); tm.getContext('2d').clearRect(0, 0, tm.width, tm.height);
     $('pvBest').innerHTML = G.selected === 'upload' ? '画像を選ぶと、色から地形が生まれる。' : '読み込み中…';
     $('startBtn').disabled = true;
     return;
   }
   $('pvName').textContent = st.name;
+  const fams = FAMS.map((f, i) => [f, (st.famCount[i] / st.playableCount) * 100]).filter(([, v]) => v >= 1).sort((a, b) => b[1] - a[1]);
+  $('pvPw').innerHTML = fams.length ? '育つ力　' + fams.map(([f, v]) => `<span><i style="--c:${f.col}"></i>${f.name} ${Math.round(v)}%</span>`).join('　') : '';
   const tc = terrainCanvas(st), tm = $('tmap');
   tm.width = st.CW; tm.height = st.CH; tm.getContext('2d').drawImage(tc, 0, 0);
   const rows = [
@@ -2212,11 +2643,19 @@ function boot() {
    ════════════════════════════════════════════════════════════ */
 const DEBUG_KEY = 'irogaeshi:debug';
 function loadDebugTune() {
-  const s = store.get(DEBUG_KEY);
-  if (s && s.foot) for (const k in FOOT) if (typeof s.foot[k] === 'number' && isFinite(s.foot[k]) && s.foot[k] >= 0) FOOT[k] = s.foot[k];
-  if (s && s.bossAt >= 1 && s.bossAt <= 100) TUNE.bossAt = Math.round(s.bossAt);
+  const s = store.get(DEBUG_KEY) || {};
+  const cfg = s.cfg || {};
+  for (const name in CFG_DEFAULT) for (const k in CFG_DEFAULT[name]) {
+    const v = cfg[name] && cfg[name][k];
+    if (typeof v === 'number' && isFinite(v) && v >= 0) CFG[name][k] = v;
+  }
 }
-const saveDebugTune = () => store.set(DEBUG_KEY, { ...(store.get(DEBUG_KEY) || {}), foot: FOOT, bossAt: TUNE.bossAt });
+const saveDebugTune = () => {
+  const cfg = {};
+  for (const name in CFG_DEFAULT) { cfg[name] = {}; for (const k in CFG_DEFAULT[name]) cfg[name][k] = CFG[name][k]; }
+  store.set(DEBUG_KEY, { ...(store.get(DEBUG_KEY) || {}), cfg });
+};
+function resetCfg() { for (const name in CFG_DEFAULT) Object.assign(CFG[name], CFG_DEFAULT[name]); }
 function enableDebug() {
   if (G.debug) return;
   G.debug = true;
@@ -2224,7 +2663,7 @@ function enableDebug() {
 }
 function disableDebug() {
   store.set(DEBUG_KEY, { ...(store.get(DEBUG_KEY) || {}), on: false });
-  Object.assign(FOOT, FOOT_DEFAULT); TUNE.bossAt = BOSS_AT_DEFAULT; G.god = false; G.noMeta = false; G.debug = false;
+  resetCfg(); G.god = false; G.noMeta = false; G.debug = false;
   const box = document.querySelector('.dbg'); if (box) box.remove();
   delete window.__dbg;
 }
@@ -2243,7 +2682,11 @@ function autoplay(seconds, god) {
     if (run.bossSpawned && out.boss == null) out.boss = +run.t.toFixed(1);
   }
   G.bot = false; G.god = keepGod;
-  Object.assign(out, { t: +run.t.toFixed(1), pct: +pct().toFixed(1), kills: run.kills, hp: run.p.hp, state: G.state, enemies: run.enemies.length, up: { ...run.up }, foot: +((run.footCells / run.stage.playableCount) * 100).toFixed(1) });
+  const R = run, pc = (n) => +((n / R.stage.playableCount) * 100).toFixed(1);
+  Object.assign(out, {
+    t: +R.t.toFixed(1), pct: +pct().toFixed(1), kills: R.kills, hp: R.p.hp, state: G.state, enemies: R.enemies.length, up: { ...R.up },
+    brush: pc(R.brushCells), strokes: R.strokes, caught: R.caught, cuts: R.cuts, dries: R.dries, eroded: pc(R.eroded), sealed: R.sealed, springs: R.springs.length, hueLv: Array.from(R.hueLv),
+  });
   return out;
 }
 function forcePct(target) {
@@ -2255,37 +2698,43 @@ function forcePct(target) {
 }
 
 function buildDebug() {
+  // [object, key, label, unit, step] — or [heading]
   const FIELDS = [
-    ['unlock', '使えるようになる復元率', '%', 1],
-    ['delay', '止まってから溜め始めるまで', '秒', 0.1],
-    ['charge', '溜め始めてから濡れるまで', '秒', 0.1],
-    ['radius', '最初に塗る半径', 'マス', 1],
-    ['grow', '立ち続けると広がる', 'マス/回', 1],
-    ['maxRadius', '広がる上限の半径', 'マス', 1],
+    ['筆で囲む'],
+    ['BRUSH', 'maxLen', '一筆の長さの上限', 'マス', 1],
+    ['BRUSH', 'maxArea', '一度に囲める広さの上限', 'マス', 10],
+    ['BRUSH', 'speed', '線を引く間の歩く速さ', '倍', 0.05],
+    ['BRUSH', 'unlock', '使えるようになる復元率', '%', 1],
+    ['墨溜まり（数と体力は次のプレイから）'],
+    ['SPRING', 'count', '数', '個', 1],
+    ['SPRING', 'hp', '体力', '', 1],
+    ['SPRING', 'reach', '色を食べる範囲', 'マス', 1],
+    ['SPRING', 'eatEvery', '1マス食べる間隔', '秒', 0.1],
+    ['SPRING', 'spawnShare', '墨溜まりから湧く割合', '', 0.05],
+    ['進行'],
+    ['TUNE', 'bossAt', 'ボスが出る復元率', '%', 1],
+    ['TUNE', 'frontier', '境界で祓うと広がる', 'マス', 1],
+    ['HUE', 'scale', '色の力に必要なマス数', '倍', 0.1],
   ];
   const box = document.createElement('div'); box.className = 'dbg';
   box.innerHTML = `<div class="dbg-p" id="dbgP" role="region" aria-label="デバッグ" hidden>
-    <h3>足元塗り</h3>
-    ${FIELDS.map(([k, l, u, s]) => `<label><span>${l}</span><input type="number" min="0" step="${s}" data-foot="${k}"><span>${u}</span></label>`).join('')}
-    <h3>進行</h3>
-    <label><span>ボスが出る復元率</span><input type="number" min="1" max="100" step="1" data-tune="bossAt"><span>%</span></label>
-    <div class="row"><button type="button" data-act="footReset">初期値に戻す</button><button type="button" data-act="footCopy">値をコピー</button></div>
+    ${FIELDS.map((f) => (f.length === 1 ? `<h3>${f[0]}</h3>` : `<label><span>${f[2]}</span><input type="number" min="0" step="${f[4]}" data-cfg="${f[0]}.${f[1]}"><span>${f[3]}</span></label>`)).join('')}
+    <div class="row"><button type="button" data-act="cfgReset">初期値に戻す</button><button type="button" data-act="cfgCopy">値をコピー</button></div>
     <h3>テスト</h3>
     <label class="ck"><input type="checkbox" data-flag="god"><span>無敵</span></label>
     <label class="ck"><input type="checkbox" data-flag="noMeta"><span>工房の強化を切る（次のプレイから）</span></label>
     <div class="row"><button type="button" data-act="pct">復元率 +10%</button><button type="button" data-act="boss">ボスを出す</button></div>
     <div class="row"><button type="button" data-act="koryo">${CURRENCY} +100</button><button type="button" data-act="metaReset">工房をリセット</button></div>
     <h3>ペース計測</h3>
-    <p class="out">選んでいるステージをボットが3回遊び、ボスが出るまでの時間を測る。工房の強化は切って測る。数秒かかる。</p>
-    <div class="row"><button type="button" data-act="paceMove">歩き続ける操作</button><button type="button" data-act="paceStand">安全なら止まる操作</button></div>
+    <p class="out">選んでいるステージをボットが3回遊び、ボスが出るまでの時間などを測る。工房の強化は切って測る。数秒かかる。</p>
+    <div class="row"><button type="button" data-act="paceMove">歩き続ける操作</button><button type="button" data-act="paceLoop">線で囲む操作</button></div>
     <p class="out" id="dbgOut" aria-live="polite"></p>
     <div class="row"><button type="button" data-act="off">デバッグをやめる</button></div>
   </div><button type="button" class="dbg-tg" id="dbgTg" aria-expanded="false" aria-controls="dbgP">DEBUG</button>`;
   document.body.appendChild(box);
   const panel = $('dbgP'), out = $('dbgOut');
   const sync = () => {
-    box.querySelectorAll('[data-foot]').forEach((el) => { el.value = String(FOOT[el.dataset.foot]); });
-    box.querySelectorAll('[data-tune]').forEach((el) => { el.value = String(TUNE[el.dataset.tune]); });
+    box.querySelectorAll('[data-cfg]').forEach((el) => { const [o, k] = el.dataset.cfg.split('.'); el.value = String(CFG[o][k]); });
     box.querySelectorAll('[data-flag]').forEach((el) => { el.checked = !!G[el.dataset.flag]; });
   };
   sync();
@@ -2295,38 +2744,39 @@ function buildDebug() {
   });
   box.addEventListener('input', (e) => {
     const el = e.target;
-    if (el.dataset.foot) {
-      const v = parseFloat(el.value);
+    if (el.dataset.cfg) {
+      const [o, k] = el.dataset.cfg.split('.'), whole = Number(el.step) >= 1;
+      let v = parseFloat(el.value);
       if (!isFinite(v) || v < 0) return;
-      FOOT[el.dataset.foot] = el.step === '1' ? Math.round(v) : v;
-      saveDebugTune();
-    } else if (el.dataset.tune) {
-      const v = Math.round(parseFloat(el.value));
-      if (!isFinite(v) || v < 1 || v > 100) return;
-      TUNE[el.dataset.tune] = v; saveDebugTune();
-      if (run) $('bossMark').style.left = `${v}%`;
+      if (whole) v = Math.round(v);
+      if (o === 'TUNE' && k === 'bossAt' && (v < 1 || v > 100)) return;
+      CFG[o][k] = v; saveDebugTune();
+      if (o === 'TUNE' && k === 'bossAt' && run) $('bossMark').style.left = `${v}%`;
     } else if (el.dataset.flag) G[el.dataset.flag] = el.checked;
   });
-  const pace = (stand) => {
+  const pace = (loop) => {
     const st = G.stages[G.selected];
     if (!st || !G.chars[G.char]) { out.textContent = 'ステージかキャラクターがまだ読み込まれていない。'; return; }
     out.textContent = '計測中…';
     setTimeout(() => {
       const keepMeta = G.noMeta, rows = [];
-      G.noMeta = true; G.botStand = stand;
+      G.noMeta = true; G.botLoop = loop;
       try { for (let i = 0; i < 3; i++) { startRun(); rows.push(autoplay(600, true)); } }
-      finally { G.noMeta = keepMeta; G.botStand = false; toTitle(); }
-      const boss = rows.map((r) => r.boss).filter((v) => v != null);
-      const avg = (a) => (a.length ? a.reduce((s, v) => s + v, 0) / a.length : NaN);
-      out.textContent = `${st.name}・${stand ? '安全なら止まる' : '歩き続ける'}操作（ボス ${TUNE.bossAt}%・足元塗り ${FOOT.unlock}%〜）\nボス出現まで 平均 ${Math.round(avg(boss))}秒（${rows.map((r) => (r.boss != null ? Math.round(r.boss) : '―')).join(' / ')}）\n足元塗りで戻した割合 平均 ${avg(rows.map((r) => r.foot)).toFixed(1)}%`;
+      finally { G.noMeta = keepMeta; G.botLoop = false; toTitle(); }
+      const avg = (f) => { const a = rows.map(f).filter((v) => v != null); return a.length ? a.reduce((s2, v) => s2 + v, 0) / a.length : NaN; };
+      out.textContent = `${st.name}・${loop ? '線で囲む' : '歩き続ける'}操作（ボス ${TUNE.bossAt}%）\n`
+        + `ボス出現まで 平均 ${Math.round(avg((r) => r.boss))}秒（${rows.map((r) => (r.boss != null ? Math.round(r.boss) : '―')).join(' / ')}）　クリア ${Math.round(avg((r) => r.t))}秒\n`
+        + `筆で囲んで戻した割合 ${avg((r) => r.brush).toFixed(1)}%（${Math.round(avg((r) => r.strokes))}回・墨 ${Math.round(avg((r) => r.caught))}体）\n`
+        + `墨溜まりの封印 ${avg((r) => r.sealed).toFixed(1)}/${rows[0].springs}　食べられた色 ${avg((r) => r.eroded).toFixed(1)}%`;
     }, 30);
   };
   box.addEventListener('click', (e) => {
     const act = e.target.dataset && e.target.dataset.act; if (!act) return;
     const inRun = G.screen === 'game' && run && (G.state === 'play' || G.state === 'paused');
-    if (act === 'footReset') { Object.assign(FOOT, FOOT_DEFAULT); TUNE.bossAt = BOSS_AT_DEFAULT; saveDebugTune(); sync(); out.textContent = '初期値に戻した。'; }
-    else if (act === 'footCopy') {
-      const text = `const FOOT = ${JSON.stringify(FOOT).replace(/"(\w+)":/g, '$1: ').replace(/,/g, ', ')};\nbossAt: ${TUNE.bossAt}`;
+    if (act === 'cfgReset') { resetCfg(); saveDebugTune(); sync(); out.textContent = '初期値に戻した。'; }
+    else if (act === 'cfgCopy') {
+      const obj = (o) => JSON.stringify(o).replace(/"(\w+)":/g, '$1: ').replace(/,/g, ', ').replace(/^\{/, '{ ').replace(/\}$/, ' }');
+      const text = `const BRUSH = ${obj(BRUSH)};\nconst SPRING = ${obj(SPRING)};\nconst HUE = ${obj(HUE)};\nTUNE.bossAt = ${TUNE.bossAt}; TUNE.frontier = ${TUNE.frontier};`;
       out.textContent = text;
       try { navigator.clipboard.writeText(text).then(() => { out.textContent = `${text}\n（コピーした）`; }, () => {}); } catch (err) { /* shown above */ }
     }
@@ -2335,21 +2785,28 @@ function buildDebug() {
     else if (act === 'koryo') { META.koryo += 100; saveMeta(); updateWallet(); out.textContent = `${CURRENCY} ${META.koryo}`; }
     else if (act === 'metaReset') { META.koryo = 0; for (const it of SHOP) META.lv[it.id] = 0; saveMeta(); updateWallet(); out.textContent = '工房をリセットした。'; }
     else if (act === 'paceMove') pace(false);
-    else if (act === 'paceStand') pace(true);
+    else if (act === 'paceLoop') pace(true);
     else if (act === 'off') disableDebug();
   });
 }
 
 function exposeDebug() { window.__dbg = {
-  G, get run() { return run; }, pct, TUNE, ENEMY, FOOT, META, SHOP, stats: (k) => G.stages[k] && G.stages[k].stats,
+  G, get run() { return run; }, pct, TUNE, ENEMY, BRUSH, SPRING, HUE, CFG, META, SHOP, FAMS, stats: (k) => G.stages[k] && G.stages[k].stats,
   start(key) { if (key) selectStage(key); startRun(); },
   forcePct,
   spawnBoss() { if (!run.bossSpawned) spawnBoss(); },
   killBoss() { if (run.boss) { hurtEnemy(run.boss, 1e9); } },
   chooseUpgrade, pause, resume, selectChar, toTitle,
   setGod(v) { G.god = !!v; },
-  // stand: the bot stops to let her feet paint whenever no ink is close
-  autoplay(seconds, god, stand) { G.botStand = !!stand; try { return autoplay(seconds, god); } finally { G.botStand = false; } },
+  // loop: the bot closes its brush lines and goes after 墨溜まり
+  autoplay(seconds, god, loop) { G.botLoop = !!loop; try { return autoplay(seconds, god); } finally { G.botLoop = false; } },
+  // run the game for `seconds` with a fixed stick input [x, y] (tests)
+  tick(seconds, input) {
+    G.forceInput = input || [0, 0];
+    try { for (let i = 0, n = Math.round(seconds * 30); i < n; i++) { if (G.state === 'upgrade') chooseUpgrade(0); if (G.state === 'play' || G.state === 'clearing') update(1 / 30); } }
+    finally { G.forceInput = null; }
+  },
+  applyRestore, sealSpring,
   get heroFrame() { return heroFrame; },
   stageImages(k) { const st = G.stages[k]; return { color: st.colorCanvas.toDataURL(), gray: st.grayCanvas.toDataURL(), terrain: terrainCanvas(st).toDataURL() }; },
   buildFromCanvas(w, h, painter) { const c = makeCanvas(w, h); painter(c.getContext('2d'), w, h); return buildStage(c, w, h, { key: 'test', name: 'test' }); },
