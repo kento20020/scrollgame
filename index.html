@@ -95,7 +95,7 @@ button{font:inherit;color:inherit}
 .card.up .nm{align-self:end}
 .card.up .ds{align-self:start}
 @media (min-width:600px){
-  .cards{grid-template-columns:repeat(5,minmax(0,1fr))}
+  .cards{grid-template-columns:repeat(6,minmax(0,1fr))}
   .card.up{grid-column:auto;display:flex;flex-direction:column;gap:5px}
   .card.up .nm,.card.up .ds{align-self:auto}
 }
@@ -279,6 +279,36 @@ button{font:inherit;color:inherit}
 .earn:empty{display:none}
 .earn b{font-family:var(--font-dot);font-weight:400;color:var(--gold)}
 @media (min-width:640px){ .stats{grid-template-columns:repeat(4,minmax(0,1fr))} }
+/* 連作: the picture this run became, mounted as a hanging scroll */
+.work{display:grid;gap:12px;border:1px solid var(--line);background:var(--ai-2);border-radius:4px;padding:12px;align-items:center}
+.work[hidden]{display:none}
+@media (min-width:640px){ .work{grid-template-columns:minmax(0,1.25fr) minmax(0,1fr)} }
+.jiku{position:relative;background:var(--ai);padding:9px 9px 13px;box-shadow:inset 0 0 0 1px var(--gold)}
+.jiku::before,.jiku::after{content:"";position:absolute;left:-5px;right:-5px;height:5px;background:var(--gold);border-radius:3px;opacity:.8}
+.jiku::before{top:-2px}.jiku::after{bottom:-2px}
+.jiku canvas{display:block;width:100%;height:auto}
+.w-info{min-width:0}
+.w-cap{margin:0;font-size:12px;color:var(--muted);letter-spacing:.1em}
+.w-title{margin:2px 0 4px;font-family:var(--font-title);font-weight:400;font-size:clamp(22px,6vw,30px);letter-spacing:.08em;color:var(--gold)}
+.w-desc,.w-series{margin:0 0 6px;font-size:13px;line-height:1.55}
+.w-series{color:var(--muted)}
+.w-series:empty{display:none}
+.w-series b{font-weight:400;color:var(--gold);letter-spacing:2px}
+.work .actions .btn{min-height:40px;padding:8px 14px;font-size:14px}
+/* 画帖 */
+.album{display:grid;gap:14px;text-align:left;margin-bottom:16px}
+.series h3{margin:0 0 6px;font-size:13px;font-weight:700;color:var(--muted)}
+.series h3 b{font-weight:400;color:var(--gold);letter-spacing:2px;margin-left:6px}
+.srow{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+@media (min-width:640px){ .srow{grid-template-columns:repeat(5,minmax(0,1fr))} }
+.aitem{background:var(--ai-2);border:1px solid var(--line);border-radius:4px;padding:6px;text-align:left;cursor:pointer;min-width:0;display:flex;flex-direction:column;gap:4px}
+.aitem:hover,.aitem:focus-visible{border-color:var(--gold)}
+.aitem canvas{display:block;width:100%;height:auto;background:var(--ink)}
+.aitem .an{font-family:var(--font-title);font-size:15px;line-height:1.3;color:var(--paper)}
+.aitem .ad{font-size:11px;color:var(--muted);line-height:1.35}
+.aslot{border:1px dashed var(--line);border-radius:4px;min-height:60px;display:grid;place-items:center;color:var(--muted);font-family:var(--font-title);font-size:18px;background:var(--ai)}
+#albumOv{background:rgba(11,15,28,.95)}
+.album-empty{color:var(--muted);font-size:14px;line-height:1.7;text-align:center;margin:8px 0 16px}
 @media (prefers-reduced-motion: reduce){
   .banner.show{animation:bannerFade 2.8s linear forwards}
   @keyframes bannerFade{0%,80%{opacity:1}100%{opacity:0}}
@@ -303,6 +333,7 @@ button{font:inherit;color:inherit}
         <div class="t-btns">
           <button type="button" class="snd snd-t" id="muteTitle" data-muted="false"><svg viewBox="0 0 18 16" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 5.5h3l4-3.5v12l-4-3.5H2z" fill="currentColor" stroke="none"/><path class="w" d="M12 5.2q1.6 2.8 0 5.6M14.4 3.2q3 4.8 0 9.6"/><path class="x" d="M12 5.5l4.5 5M16.5 5.5l-4.5 5"/></svg><span class="snd-l">音 あり</span></button>
           <button type="button" class="snd-t" id="shopBtn">工房　<b id="shopWallet">0</b> <span id="shopCur">香料</span></button>
+          <button type="button" class="snd-t" id="albumBtn">画帖　<b id="albumCount">0</b></button>
         </div>
       </div>
       <div class="portrait"><img id="portraitImg" alt=""></div>
@@ -399,6 +430,16 @@ button{font:inherit;color:inherit}
       <p class="newbest" id="rBest" hidden>自己ベスト更新</p>
       <p class="earn" id="rEarn"></p>
       <p class="earn" id="rPw"></p>
+      <div class="work" id="rWork" hidden>
+        <div class="jiku"><canvas id="rWorkCv" width="512" height="384" aria-label="この一戦から生まれた絵"></canvas></div>
+        <div class="w-info">
+          <p class="w-cap">この一戦が絵になった</p>
+          <h3 class="w-title" id="rWorkTitle"></h3>
+          <p class="w-desc" id="rWorkDesc"></p>
+          <p class="w-series" id="rWorkSeries"></p>
+          <div class="actions"><button class="btn" id="workPlay">この絵で遊ぶ</button><button class="btn" id="workSave">画像を保存</button></div>
+        </div>
+      </div>
       <div class="actions"><button class="btn primary" id="againBtn">もう一度</button><button class="btn" id="backBtn">ステージを選ぶ</button></div>
     </div>
   </section>
@@ -410,6 +451,15 @@ button{font:inherit;color:inherit}
       <p class="ov-sub" id="shopSub"></p>
       <div class="shop" id="shopList"></div>
       <div class="actions"><button class="btn primary" id="shopClose">閉じる</button></div>
+    </div>
+  </div>
+  <!-- ═════════ 画帖 (album of 連作) ═════════ -->
+  <div class="overlay modal" id="albumOv" role="dialog" aria-modal="true" aria-labelledby="albumTitle">
+    <div class="ov-panel">
+      <h2 class="ov-title" id="albumTitle">画帖</h2>
+      <p class="ov-sub" id="albumSub"></p>
+      <div class="album" id="albumList"></div>
+      <div class="actions"><button class="btn primary" id="albumClose">閉じる</button></div>
     </div>
   </div>
 </div>
@@ -1768,6 +1818,7 @@ function newRun(st) {
     dCanvas, dctx, dImg, dirty: false, gCanvas, gctx, gImg: gctx.createImageData(st.CW, st.CH), gDirty: false, glowAny: false,
     kCanvas, kctx, kImg, kDirty: false, thin: new Uint8Array(st.N), inkMass: st.playableCount, ink0: st.playableCount, rho: 1, dense: false,
     denseAt: null, densePct: null, thinned: 0, bossInk: null, bossScale: 1, bossFrom: null, simmerT: 0,
+    rec: newRecord(st),
     nextThr: 0, pendingUp: 0, upWhy: [], boss: null, bossSpawned: false, spawnAcc: 0.6, fireT: 0.4,
     shake: 0, clearT: 0, cam: { x: 0, y: 0, w: 300, h: 300 },
   };
@@ -2185,6 +2236,7 @@ function sealSpring(s, brush) {
   if (s.dead) return;
   s.dead = true; R.sealed++; R.sealTimes.push(+R.t.toFixed(1)); if (brush) R.sealedBrush++;
   takeInk(INK.spring * R.ink0);
+  R.rec.seals.push([Math.round(s.x), Math.round(s.y)]);
   restoreAt(s.x, s.y, 4);
   for (const e of R.enemies) if (!e.dead && !e.boss && Math.hypot(e.x - s.x, e.y - s.y) < 48) purify(e);
   burst(s.x, s.y, 16, 3);
@@ -2335,6 +2387,7 @@ function closeTrail() {
   if (tooBig) say('広すぎて囲めない');
   else if (leaky) say('囲いが開いている');
   sfx('restore'); if (caught) sfx('kill');
+  recLoop(R, T.pts, fill, fresh + thinned);
   clearTrail(T);
 }
 
@@ -2365,6 +2418,278 @@ function processQueue() {
   let w = 0;
   for (let i = 0; i < R.queue.length; i++) { const q = R.queue[i]; if (q.at <= R.time) applyRestore(q.c); else R.queue[w++] = q; }
   R.queue.length = w;
+}
+
+/* ════════════════════════════════════════════════════════════
+   4c. 連作 — one run becomes the next picture
+   While she plays, the run is recorded (her path, brush loops, kills, hits, seals, where 大墨 fell). When it
+   ends, a 流派 (a generative style; see docs/ryuha_zankyo.md) paints the record into a picture and draws a
+   gimmick mask from the same record, and the two together are a new stage. Playing that stage records the next
+   run, and so on: a series (連作) of pictures made only by playing. Works live in the 画帖 (localStorage).
+   ════════════════════════════════════════════════════════════ */
+const ALBUM_KEY = 'irogaeshi:album', ALBUM_MAX = 24, WORK_V = 1, SERIES_LEN = 5;
+const KANSUJI = ['〇', '一', '二', '三', '四', '五', '六', '七', '八', '九', '十'];
+const kanNum = (n) => (n <= 10 ? KANSUJI[n] : n < 20 ? `十${KANSUJI[n - 10]}` : String(n));
+function hslToRgb(h, s, l) {
+  h = (((h % 360) + 360) % 360) / 360;
+  const q = l < 0.5 ? l * (1 + s) : l + s - l * s, p = 2 * l - q;
+  const f = (t) => { t = (t + 1) % 1; return t < 1 / 6 ? p + (q - p) * 6 * t : t < 1 / 2 ? q : t < 2 / 3 ? p + (q - p) * (2 / 3 - t) * 6 : p; };
+  return [Math.round(f(h + 1 / 3) * 255), Math.round(f(h) * 255), Math.round(f(h - 1 / 3) * 255)];
+}
+// a colour of the given hue, lightness and chroma (max − min, 0–1: the measure famOf / classify read)
+const hcl = (h, c, l) => hslToRgb(h, Math.min(1, c / Math.max(0.01, 1 - Math.abs(2 * l - 1))), l);
+const rgba = (v, a = 1) => `rgba(${v[0]},${v[1]},${v[2]},${a})`;
+// one wash per colour family, chosen so it keeps its family and never reads as water or 朱 ground
+const WASH = [
+  { h: 350, c: 0.22, l: 0.66 }, // 朱: a dusty rose (chroma under 0.28, so floor rather than 朱 ground)
+  { h: 52, c: 0.3, l: 0.62 },   // 金
+  { h: 105, c: 0.26, l: 0.56 }, // 緑
+  { h: 212, c: 0.2, l: 0.86 },  // 藍: kept pale (lightness over 0.8, so floor rather than water)
+  { h: 284, c: 0.24, l: 0.62 }, // 紫
+  { h: 42, c: 0.05, l: 0.88 },  // 白: the paper itself
+];
+const WATER_C = { h: 205, c: 0.38, l: 0.48 }, VERMILION = { h: 8, c: 0.62, l: 0.48 };
+
+/* ── recording ── */
+function newRecord(st) { return { W: st.W, H: st.H, step: 0.25, nextT: 0, path: [], loops: [], kills: [], nk: 0, hits: [], seals: [], boss: null, end: null }; }
+function recPath(R) {
+  const r = R.rec; if (R.t < r.nextT) return;
+  r.nextT = R.t + r.step;
+  r.path.push(Math.round(R.p.x), Math.round(R.p.y));
+  if (r.path.length >= 4800) { // 2400 points: keep every other one and sample half as often from now on
+    const p = []; for (let i = 0; i < r.path.length; i += 4) p.push(r.path[i], r.path[i + 1]);
+    r.path = p; r.step *= 2;
+  }
+}
+function recKill(R, e) {
+  const r = R.rec, v = [Math.round(e.x), Math.round(e.y), e.type === 'big' ? 1 : 0];
+  r.nk++;
+  if (r.kills.length < 400) r.kills.push(v); else { const j = (Math.random() * r.nk) | 0; if (j < 400) r.kills[j] = v; }
+}
+// a closed brush loop: its outline (≤ 32 points), how much it took in, and the colour family most of it was
+function recLoop(R, pts, cells, n) {
+  if (n < 8 || pts.length < 8) return;
+  const st = R.stage, cnt = new Array(FAMS.length).fill(0);
+  for (const c of cells) if (st.fam[c] !== NOFAM) cnt[st.fam[c]]++;
+  let fam = -1, best = 0; cnt.forEach((v, i) => { if (v > best) { best = v; fam = i; } });
+  const k = Math.max(1, Math.ceil(pts.length / 2 / 32)), poly = [];
+  for (let i = 0; i < pts.length / 2; i += k) poly.push(Math.round(pts[i * 2]), Math.round(pts[i * 2 + 1]));
+  const L = R.rec.loops; L.push({ poly, n, fam });
+  if (L.length > 40) { L.sort((a, b) => b.n - a.n); L.length = 24; }
+}
+
+/* ── the work: a compact copy of the record, enough to paint it again exactly ── */
+function makeWork(R, outcome) {
+  const r = R.rec, st = R.stage;
+  if (!r || r.path.length < 80) return null; // under ~10 s of play: too little to paint
+  const prev = st.work || null, n = r.path.length / 2, k = Math.max(1, Math.ceil(n / 600)), path = [];
+  for (let i = 0; i < n; i += k) path.push(r.path[i * 2], r.path[i * 2 + 1]);
+  const id = `${Date.now().toString(36)}${Math.floor(Math.random() * 1296).toString(36)}`;
+  const end = r.end || [path[path.length - 2], path[path.length - 1]];
+  return {
+    id, v: WORK_V, ryuha: 'zankyo', seed: hash(path.length, r.nk, Math.round(R.t * 10) + end[0] * 7 + end[1]) || 1,
+    chain: prev ? prev.chain + 1 : 1, series: prev ? prev.series : id, date: new Date().toISOString().slice(0, 10),
+    src: { key: st.key, name: prev ? prev.src.name : st.name, tpl: R.tplId, outcome, pct: Math.floor(pct()), t: Math.round(R.t) },
+    rec: {
+      W: r.W, H: r.H, step: r.step * k, path, end: end.map(Math.round), boss: r.boss && r.boss.map(Math.round),
+      loops: r.loops.slice().sort((a, b) => b.n - a.n).slice(0, 16), kills: r.kills.slice(0, 300), hits: r.hits.slice(0, 24), seals: r.seals.slice(),
+      hue: Array.from(R.hue),
+    },
+  };
+}
+const workTitle = (w) => `${RYUHA[w.ryuha].name}　其の${kanNum(w.chain)}`;
+
+/* ── 流派「残響」 ── */
+const RYUHA = { zankyo: { name: '残響', seal: '響', paint: paintZankyo } };
+// watercolour: overlapping soft discs around (x, y)
+function bloom(g, x, y, rad, col, rnd, a = 0.2) {
+  for (let i = 0; i < 14; i++) {
+    const t = rnd() * Math.PI * 2, d = rnd() * rad * 0.45, rr = rad * (0.45 + rnd() * 0.45), cx = x + Math.cos(t) * d, cy = y + Math.sin(t) * d;
+    const gr = g.createRadialGradient(cx, cy, rr * 0.15, cx, cy, rr);
+    gr.addColorStop(0, rgba(col, a)); gr.addColorStop(0.72, rgba(col, a * 0.7)); gr.addColorStop(1, rgba(col, 0));
+    g.fillStyle = gr; g.beginPath(); g.arc(cx, cy, rr, 0, Math.PI * 2); g.fill();
+  }
+}
+// stretches of her path that ran straight (the chord stays ≥ 85% of the distance walked), longest first
+function straightRuns(P, minLen) {
+  const out = [], d = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1]);
+  let i = 0;
+  while (i < P.length - 4) {
+    let j = i + 1, walked = 0;
+    for (; j < P.length; j++) { walked += d(P[j - 1], P[j]); if (walked > 24 && d(P[i], P[j]) < walked * 0.85) break; }
+    const e = Math.min(j, P.length - 1), L = d(P[i], P[e]);
+    if (L >= minLen) { out.push({ a: i, b: e, len: L }); i = e; } else i++;
+  }
+  return out.sort((x, y) => y.len - x.len);
+}
+function polyline(g, P, a, b, step = 2) {
+  g.beginPath(); g.moveTo(P[a][0], P[a][1]);
+  for (let i = a + step; i < b; i += step) g.lineTo(P[i][0], P[i][1]);
+  g.lineTo(P[b][0], P[b][1]);
+}
+// a broken stroke along P[a..b]: inked dashes with gaps wide enough to walk through
+function dashed(g, P, a, b, rnd, width, ink) {
+  let on = true, left = 40 + rnd() * 24;
+  g.lineCap = 'round'; g.strokeStyle = ink;
+  for (let i = a + 1; i <= b; i++) {
+    const [x0, y0] = P[i - 1], [x1, y1] = P[i], seg = Math.hypot(x1 - x0, y1 - y0);
+    if (on) { g.lineWidth = width * (0.75 + rnd() * 0.4); g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1); g.stroke(); }
+    left -= seg;
+    if (left <= 0) { on = !on; left = on ? 38 + rnd() * 26 : 20 + rnd() * 8; }
+  }
+}
+// 円相: one stroke round the circle that stays open for its last 50–75°, heavy at the start and thinning out
+function enso(g, cx, cy, r, rnd, width, ink) {
+  const gap = ((50 + rnd() * 25) * Math.PI) / 180, a0 = rnd() * Math.PI * 2, steps = 72, sweep = Math.PI * 2 - gap, wob = rnd() * 6;
+  g.strokeStyle = ink; g.lineCap = 'round';
+  for (let i = 0; i < steps; i++) {
+    const t0 = i / steps, t1 = (i + 1) / steps, a = a0 + t0 * sweep, b = a0 + t1 * sweep;
+    const rr = r * (1 + 0.05 * Math.sin(t0 * 7 + wob)), w = width * (t0 < 0.1 ? 0.75 + t0 * 3 : 1.12 - t0 * 0.55);
+    g.lineWidth = Math.max(2, w);
+    g.beginPath(); g.moveTo(cx + Math.cos(a) * rr, cy + Math.sin(a) * rr); g.lineTo(cx + Math.cos(b) * rr, cy + Math.sin(b) * rr); g.stroke();
+  }
+}
+function paintZankyo(w, level) {
+  const r = w.rec, W = 512, H = Math.round(clamp((512 * r.H) / r.W, 240, 512)), sx = W / r.W, sy = H / r.H;
+  const cv = makeCanvas(W, H), g = cv.getContext('2d'), mk = makeCanvas(W, H), m = mk.getContext('2d');
+  const rnd = mulberry32(w.seed), U = (a, b) => a + (b - a) * rnd();
+  const P = []; for (let i = 0; i < r.path.length; i += 2) P.push([r.path[i] * sx, r.path[i + 1] * sy]);
+  // the colours she brought back most become the washes (paper white does not count)
+  const fams = r.hue.map((v, f) => [v, f]).filter(([v, f]) => v > 0 && f !== F_SHIRO).sort((a, b) => b[0] - a[0]).map(([, f]) => f);
+  if (!fams.length) fams.push(F_AI, F_MIDORI);
+  const wash = (f, dl = 0) => { const s = WASH[f]; return hcl(s.h + U(-6, 6), s.c, Math.min(0.9, s.l + dl)); };
+  const inkOf = (l) => rgba(hcl(230, 0.04, l));
+  // 1. paper and its fibres
+  g.fillStyle = rgba(hcl(WASH[F_SHIRO].h, 0.05, 0.88)); g.fillRect(0, 0, W, H);
+  for (let i = 0; i < 1100; i++) {
+    const x = U(0, W), y = U(0, H), a = U(0, Math.PI), len = U(3, 11);
+    g.strokeStyle = rnd() < 0.55 ? 'rgba(255,251,242,0.16)' : 'rgba(110,96,78,0.08)'; g.lineWidth = U(0.5, 1.3);
+    g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.cos(a) * len, y + Math.sin(a) * len); g.stroke();
+  }
+  // 2. washes where she spent her time (the busiest cells of a 4×3 grid over her path)
+  const bins = [];
+  for (let by = 0; by < 3; by++) for (let bx = 0; bx < 4; bx++) bins.push({ x: 0, y: 0, n: 0 });
+  for (const [x, y] of P) { const b = bins[Math.min(2, Math.floor((y / H) * 3)) * 4 + Math.min(3, Math.floor((x / W) * 4))]; b.x += x; b.y += y; b.n++; }
+  bins.filter((b) => b.n >= 4).sort((a, b) => b.n - a.n).slice(0, 6).forEach((b, i) => bloom(g, b.x / b.n, b.y / b.n, U(95, 150), wash(fams[i % fams.length]), rnd, 0.3));
+  // 3. water along the longest straight runs; the next ones become broken bold strokes
+  const runs = straightRuns(P, 70);
+  const streams = runs.filter((q) => q.len >= 100).slice(0, level ? 1 : 2), strokes = runs.filter((q) => !streams.includes(q)).slice(0, Math.max(0, 6 - level * 2));
+  g.lineCap = 'round'; g.lineJoin = 'round';
+  for (const q of streams) {
+    g.strokeStyle = rgba(hcl(WATER_C.h, WATER_C.c, WATER_C.l)); g.lineWidth = U(20, 26); polyline(g, P, q.a, q.b); g.stroke();
+    g.strokeStyle = rgba(hcl(WATER_C.h - 8, WATER_C.c, WATER_C.l + 0.12), 0.8); g.lineWidth = U(5, 8); polyline(g, P, q.a, q.b); g.stroke();
+  }
+  // 残響: faint ripples spreading from where the fight was loudest (大墨's fall, else the thickest of the fighting)
+  const loud = [];
+  if (r.boss) loud.push([r.boss[0] * sx, r.boss[1] * sy]);
+  if (bins.length) { const b0 = bins.slice().sort((a, b) => b.n - a.n)[0]; if (b0.n) loud.push([b0.x / b0.n, b0.y / b0.n]); }
+  for (const [lx, ly] of loud.slice(0, 2)) {
+    for (let k = 0, rr = U(26, 34); k < 9; k++, rr += U(22, 30)) {
+      g.strokeStyle = inkOf(0.55); g.globalAlpha = 0.24 * (1 - k / 9); g.lineWidth = U(1.2, 2.4);
+      g.beginPath(); g.arc(lx, ly, rr, 0, Math.PI * 2); g.stroke();
+    }
+  }
+  g.globalAlpha = 1;
+  // 4. her whole path: 筆圧 is slowness — a dry thin trace where she ran, deep ink where she stood and fought
+  const full = r.step * BASE_SPEED * sx;
+  for (let i = 1; i < P.length; i++) {
+    const [x0, y0] = P[i - 1], [x1, y1] = P[i], slow = 1 - clamp(Math.hypot(x1 - x0, y1 - y0) / full, 0, 1);
+    g.strokeStyle = inkOf(0.42 - 0.34 * slow); g.globalAlpha = 0.28 + 0.6 * slow * slow;
+    g.lineWidth = 1.2 + slow * slow * (6.5 - level * 2);
+    g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1 + 0.01, y1); g.stroke();
+  }
+  g.globalAlpha = 1;
+  for (const q of strokes) dashed(g, P, q.a, q.b, rnd, 19 - level * 3, inkOf(0.06));
+  // 5. 円相 from her biggest brush loops; the inside takes the colour she brought back there (名所 on the mask)
+  const rings = [];
+  for (const L of r.loops) {
+    if (rings.length >= (level ? 2 : 3)) break;
+    const n = L.poly.length / 2; let ax = 0, ay = 0, area = 0;
+    for (let i = 0; i < n; i++) {
+      const x0 = L.poly[i * 2] * sx, y0 = L.poly[i * 2 + 1] * sy, x1 = L.poly[((i + 1) % n) * 2] * sx, y1 = L.poly[((i + 1) % n) * 2 + 1] * sy;
+      ax += x0; ay += y0; area += x0 * y1 - x1 * y0;
+    }
+    const rad = clamp(Math.sqrt(Math.abs(area) / 2 / Math.PI) * 1.15, 24, 58);
+    const cx = clamp(ax / n, rad + 12, W - rad - 12), cy = clamp(ay / n, rad + 12, H - rad - 12);
+    if (rings.some((q) => Math.hypot(q.x - cx, q.y - cy) < q.r + rad + 8)) continue;
+    rings.push({ x: cx, y: cy, r: rad, fam: L.fam >= 0 && L.fam !== F_SHIRO ? L.fam : fams[0] });
+  }
+  const paper = rgba(hcl(WASH[F_SHIRO].h, 0.05, 0.88));
+  for (const q of rings) {
+    g.fillStyle = paper; g.beginPath(); g.arc(q.x, q.y, q.r - 3, 0, Math.PI * 2); g.fill(); // the inside of a 円相 is left clean
+    bloom(g, q.x, q.y, q.r * 0.9, wash(q.fam, 0.06), rnd, 0.3);
+    enso(g, q.x, q.y, q.r, rnd, 17 - level * 2, inkOf(0.05));
+    m.fillStyle = 'rgb(255,255,0)'; m.beginPath(); m.arc(q.x, q.y, Math.max(8, q.r - 10), 0, Math.PI * 2); m.fill();
+  }
+  // 6. 墨はね where she purified the most ink: the next 墨溜まり sleep there
+  const kb = new Map();
+  for (const [x, y, big] of r.kills) { const key = `${Math.floor((x * sx) / 44)},${Math.floor((y * sy) / 44)}`, b = kb.get(key) || { x: 0, y: 0, n: 0, s: 0 }; b.x += x * sx; b.y += y * sy; b.n++; b.s += big ? 3 : 1; kb.set(key, b); }
+  const wells = [];
+  for (const b of [...kb.values()].filter((v) => v.n >= 5).sort((a, c) => c.s - a.s)) {
+    const x = b.x / b.n, y = b.y / b.n;
+    if (wells.length >= 3 || wells.some((q) => Math.hypot(q[0] - x, q[1] - y) < 90) || rings.some((q) => Math.hypot(q.x - x, q.y - y) < q.r + 10)) continue;
+    wells.push([x, y]);
+    g.fillStyle = inkOf(0.24); g.beginPath(); g.arc(x, y, U(8, 11), 0, Math.PI * 2); g.fill();
+    for (let i = 0; i < 16; i++) { const a = U(0, Math.PI * 2), d = U(9, 30); g.fillStyle = inkOf(U(0.08, 0.3)); g.beginPath(); g.arc(x + Math.cos(a) * d, y + Math.sin(a) * d, U(0.8, 2.8), 0, Math.PI * 2); g.fill(); }
+    m.fillStyle = 'rgb(255,0,0)'; m.beginPath(); m.arc(x, y, 5, 0, Math.PI * 2); m.fill();
+  }
+  // 7. 朱 where she was hurt (it heals her once she brings it back)
+  for (const [x, y] of r.hits.slice(0, 10)) { g.fillStyle = rgba(hcl(VERMILION.h, VERMILION.c, VERMILION.l)); g.beginPath(); g.arc(x * sx, y * sy, U(9, 11), 0, Math.PI * 2); g.fill(); }
+  // 8. a swirl where 大墨 broke apart
+  if (r.boss) {
+    const bx = r.boss[0] * sx, by = r.boss[1] * sy;
+    bloom(g, bx, by, 34, wash(F_KIN), rnd, 0.22);
+    g.strokeStyle = inkOf(0.18); g.lineWidth = 2.5; g.beginPath();
+    for (let t = 0; t <= 1; t += 0.01) { const a = t * Math.PI * 6, rr = 3 + t * 32; g.lineTo(bx + Math.cos(a) * rr, by + Math.sin(a) * rr); }
+    g.stroke();
+  }
+  // 9. title down the right edge and the 流派 seal under it
+  const ry = RYUHA[w.ryuha], title = `${ry.name}其${kanNum(w.chain)}`, sy0 = 18 + title.length * 16 + 4;
+  g.fillStyle = rgba(hcl(WASH[F_SHIRO].h, 0.05, 0.9), 0.92); g.fillRect(W - 27, 6, 26, sy0 + 20); // a paper strip keeps the title clear of the strokes
+  g.fillStyle = inkOf(0.3); g.font = '600 14px "Zen Antique","Noto Serif JP",serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  [...title].forEach((ch, i) => g.fillText(ch, W - 14, 18 + i * 16));
+  g.fillStyle = rgba(hcl(VERMILION.h, VERMILION.c, VERMILION.l)); g.fillRect(W - 24, sy0, 20, 20);
+  g.fillStyle = rgba(hcl(40, 0.05, 0.93)); g.font = '600 14px "Zen Antique","Noto Serif JP",serif'; g.fillText(ry.seal, W - 14, sy0 + 11);
+  // the next run starts where this one ended
+  m.fillStyle = 'rgb(0,255,0)'; m.beginPath(); m.arc(r.end[0] * sx, r.end[1] * sy, 5, 0, Math.PI * 2); m.fill();
+  return { canvas: cv, mask: mk, W, H, rings: rings.length, wells: wells.length, streams: streams.length, strokes: strokes.length };
+}
+function paintWork(w, level = 0) { return RYUHA[w.ryuha].paint(w, level); }
+// the work as a stage: painted, then checked — too shut in, and it is painted again with lighter strokes
+function workStage(w) {
+  let st = null, art = null;
+  for (let level = 0; level < 3; level++) {
+    art = paintWork(w, level);
+    // its circles are the places to go back to (名所めぐり); with too few, it is the 墨溜まり born where she fought
+    st = buildStage(art.canvas, art.W, art.H, { key: `work:${w.id}`, name: workTitle(w), mask: art.mask, template: art.rings >= 2 ? 'meisho' : 'fuuin' });
+    if (st.stats.playable >= 52 && st.stats.wall <= 30) break;
+  }
+  st.work = w; st.cover = art.canvas; st.paintInfo = art;
+  return st;
+}
+
+/* ── 画帖 (album) ── */
+function loadAlbum() { const a = store.get(ALBUM_KEY); return Array.isArray(a) ? a.filter((w) => w && w.v === WORK_V && w.rec && RYUHA[w.ryuha]) : []; }
+function saveWork(w) {
+  const a = loadAlbum(); a.unshift(w);
+  while (a.length > ALBUM_MAX) a.pop();
+  store.set(ALBUM_KEY, a);
+}
+function seriesOf(w) { return loadAlbum().filter((x) => x.series === w.series).sort((a, b) => a.chain - b.chain); }
+// a mounted copy of the work (掛け軸) as a PNG the player can keep
+function workImage(w) {
+  const art = paintWork(w, 0).canvas, pad = 26, side = 34, cv = makeCanvas(art.width + pad * 2 + side, art.height + pad * 2), g = cv.getContext('2d');
+  g.fillStyle = C.ai; g.fillRect(0, 0, cv.width, cv.height);
+  g.fillStyle = C.gold; g.fillRect(pad - 4, pad - 4, art.width + 8, art.height + 8);
+  g.drawImage(art, pad, pad);
+  g.fillStyle = C.paper; g.font = '18px "Zen Antique","Noto Serif JP",serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  [...`${workTitle(w).replace('　', '')}`].forEach((ch, i) => g.fillText(ch, cv.width - side / 2 - 4, pad + 14 + i * 22));
+  g.fillStyle = C.muted; g.font = '11px "DotGothic16",monospace';
+  [...`${w.src.name}より`].forEach((ch, i) => g.fillText(ch, cv.width - side / 2 - 4, cv.height - pad - 10 - (`${w.src.name}より`.length - 1 - i) * 13));
+  return cv;
+}
+function downloadWork(w) {
+  try { const a = document.createElement('a'); a.download = `${workTitle(w).replace('　', '_')}.png`; a.href = workImage(w).toDataURL('image/png'); document.body.appendChild(a); a.click(); a.remove(); } catch (e) { /* downloads unavailable */ }
 }
 
 /* ════════════════════════════════════════════════════════════
@@ -2524,6 +2849,7 @@ function killEnemy(e) {
   if (!e.boss) sfx('kill');
   burst(e.x, e.y, e.boss ? 24 : e.r > 6 ? 9 : 5, e.boss ? 3 : 2);
   if (e.boss) { bossDefeated(e); return; }
+  recKill(R, e);
   const front = TUNE.frontier > 0 && onFrontier(e.x, e.y);
   // ink purified in the gray or at its edge is gone; ink struck down deep in her colour seeps back into the gray
   if (front || !R.restored[cellIndex(e.x, e.y)]) takeInk(inkOf(e));
@@ -2532,6 +2858,7 @@ function killEnemy(e) {
 }
 function bossDefeated(b) {
   const R = run, st = R.stage;
+  R.rec.boss = [b.x, b.y];
   for (const e of R.enemies) if (!e.dead) { e.dead = true; burst(e.x, e.y, 4, 2); }
   R.boss = null;
   for (const q of R.springs) q.dead = true;
@@ -2562,6 +2889,7 @@ function hitPlayer(src) {
     return;
   }
   P.hp--; P.inv = 1.0;
+  if (R.rec.hits.length < 40) R.rec.hits.push([Math.round(P.x), Math.round(P.y)]);
   if (R.trail.on) cutTrail(P.x, P.y);
   sfx('hurt');
   const dx = P.x - src.x, dy = P.y - R.geo.mid - src.y, d = Math.hypot(dx, dy) || 1;
@@ -2596,6 +2924,7 @@ function update(dt) {
   if (P.inv > 0) P.inv -= dt;
   if (R.shake > 0) R.shake -= dt;
   computeCamera();
+  if (G.state === 'play') recPath(R);
 
   // 朱 healing
   const c1 = cellIndex(P.x, P.y);
@@ -3328,6 +3657,12 @@ function endRun(kind) {
   if (R.dirty) { R.dctx.putImageData(R.dImg, 0, 0); R.dirty = false; }
   const rc = $('rCanvas'); rc.width = st.W; rc.height = st.H;
   const g = rc.getContext('2d'); g.imageSmoothingEnabled = false; g.drawImage(R.dCanvas, 0, 0, st.W, st.H);
+  // 連作: the run is painted into the next picture
+  R.rec.end = [R.p.x, R.p.y];
+  const work = makeWork(R, kind);
+  G.lastWork = work; G.lastWorkStage = null;
+  if (work && (!G.bot || G.keepBotWorks)) saveWork(work);
+  showWork(work);
   $('upOv').classList.remove('on'); $('pauseOv').classList.remove('on');
   joy.active = false; keys.clear();
   showScreen('result');
@@ -3352,10 +3687,10 @@ function renderPreview() {
   $('pvMsg').hidden = true;
   const legend = $('legend'); legend.textContent = '';
   if (!st) {
-    $('pvName').textContent = G.selected === 'upload' ? '画像からつくる' : '準備中…';
+    $('pvName').textContent = G.selected === 'upload' ? '画像からつくる' : G.selected === 'album' ? '画帖の絵' : '準備中…';
     $('pvPw').textContent = ''; $('tpls').textContent = ''; $('tplDesc').textContent = '';
     const tm = $('tmap'); tm.getContext('2d').clearRect(0, 0, tm.width, tm.height);
-    $('pvBest').innerHTML = G.selected === 'upload' ? '画像を選ぶと、色から地形が生まれる。' : '読み込み中…';
+    $('pvBest').innerHTML = G.selected === 'upload' ? '画像を選ぶと、色から地形が生まれる。' : G.selected === 'album' ? '遊び終えた一戦は一枚の絵になる。画帖から絵を選ぶと、その絵で遊べる。' : '読み込み中…';
     $('startBtn').disabled = true;
     return;
   }
@@ -3451,8 +3786,69 @@ function handleCharFile(file) {
   reader.readAsDataURL(file);
 }
 
+/* ── 連作: the result's work, the 画帖 and the album card ── */
+const thumbCache = new Map();
+function workThumb(w) { if (!thumbCache.has(w.id)) thumbCache.set(w.id, paintWork(w, 0).canvas); return thumbCache.get(w.id); }
+const seriesMarks = (n) => `${'◆'.repeat(Math.min(SERIES_LEN, n))}${'◇'.repeat(Math.max(0, SERIES_LEN - n))}`;
+function showWork(w) {
+  $('rWork').hidden = !w || (G.bot && !G.keepBotWorks);
+  if ($('rWork').hidden) return;
+  const st = workStage(w), cv = $('rWorkCv');
+  G.lastWorkStage = st; thumbCache.set(w.id, st.cover);
+  cv.width = st.cover.width; cv.height = st.cover.height; cv.getContext('2d').drawImage(st.cover, 0, 0);
+  $('rWorkTitle').textContent = workTitle(w);
+  const oc = { clear: '大墨を祓った', retreat: '撤収した', death: '倒れた' }[w.src.outcome] || '終えた';
+  $('rWorkDesc').textContent = `${fmtTime(w.src.t)}で${oc}一戦から。歩いた道・囲んだ輪・祓った墨が、そのまま次の地形になる。`;
+  $('rWorkSeries').innerHTML = `「<span></span>」の連作 <b>${seriesMarks(w.chain)}</b>${w.chain === SERIES_LEN ? '　五枚そろった' : w.chain > SERIES_LEN ? `　其の${kanNum(w.chain)}` : ''}`;
+  $('rWorkSeries').querySelector('span').textContent = w.src.name;
+}
+// put a work on the album card and select it as the stage
+function useWorkStage(w, st) {
+  if (!st || st.work !== w) st = workStage(w);
+  G.stages.album = st;
+  const card = cardFor('album');
+  if (card) {
+    card.querySelector('.ph').hidden = true;
+    const c = card.querySelector('canvas'); c.hidden = false; drawCover(c, st.cover);
+    card.querySelector('.nm').textContent = workTitle(w); card.querySelector('.ds').textContent = 'もう一度押すと画帖';
+  }
+  selectStage('album');
+}
+function renderAlbum() {
+  const a = loadAlbum(), box = $('albumList'); box.textContent = '';
+  $('albumSub').textContent = a.length ? `${a.length}枚 ― 遊び終えるたびに、その一戦が一枚の絵になる。絵を選ぶと、その絵のステージで遊べる。` : '';
+  if (!a.length) { box.innerHTML = '<p class="album-empty">まだ絵がない。<br>ステージを遊び終えると、その一戦が一枚の絵になってここに収まる。</p>'; return; }
+  const groups = new Map(); // series, newest first (the album is kept newest first)
+  for (const w of a) { if (!groups.has(w.series)) groups.set(w.series, []); groups.get(w.series).push(w); }
+  for (const ws of groups.values()) {
+    ws.sort((x, y) => x.chain - y.chain);
+    const top = ws[ws.length - 1].chain, sec = document.createElement('section'); sec.className = 'series';
+    sec.innerHTML = `<h3><span></span><b>${seriesMarks(top)}</b></h3><div class="srow"></div>`;
+    sec.querySelector('span').textContent = `「${ws[0].src.name}」の連作${top >= SERIES_LEN ? '（完成）' : ''}`;
+    const row = sec.querySelector('.srow');
+    for (const w of ws) {
+      const b = document.createElement('button'); b.type = 'button'; b.className = 'aitem';
+      b.innerHTML = '<canvas aria-hidden="true"></canvas><span class="an"></span><span class="ad"></span>';
+      b.querySelector('.an').textContent = workTitle(w);
+      b.querySelector('.ad').textContent = `${w.date}・${fmtTime(w.src.t)}・${w.src.pct}%`;
+      b.setAttribute('aria-label', `${workTitle(w)}を選ぶ`);
+      const art = workThumb(w), c = b.querySelector('canvas');
+      c.width = 192; c.height = Math.round((192 * art.height) / art.width); c.getContext('2d').drawImage(art, 0, 0, c.width, c.height);
+      b.addEventListener('click', () => { sfx('click'); useWorkStage(w); closeAlbum(); });
+      row.appendChild(b);
+    }
+    for (let i = top; i < SERIES_LEN; i++) { const sl = document.createElement('div'); sl.className = 'aslot'; sl.textContent = kanNum(i + 1); sl.setAttribute('aria-hidden', 'true'); row.appendChild(sl); }
+    box.appendChild(sec);
+  }
+}
+function openAlbum() {
+  renderAlbum(); $('albumOv').classList.add('on');
+  ($('albumList').querySelector('.aitem') || $('albumClose')).focus({ preventScroll: true });
+}
+function closeAlbum() { $('albumOv').classList.remove('on'); $('albumBtn').focus({ preventScroll: true }); }
+
 /* ── 工房 (workshop) ── */
-function updateWallet() { $('shopWallet').textContent = String(META.koryo); $('shopCur').textContent = CURRENCY; }
+function updateWallet() { $('shopWallet').textContent = String(META.koryo); $('shopCur').textContent = CURRENCY; $('albumCount').textContent = String(loadAlbum().length); }
 function renderShop(focusId) {
   $('shopSub').innerHTML = `所持 <b>${META.koryo}</b> ${CURRENCY} ― 道具を手入れすると、次の旅が少しだけ楽になる`;
   const box = $('shopList'); box.textContent = '';
@@ -3528,6 +3924,7 @@ const KEYMAP = { KeyW: 'up', ArrowUp: 'up', KeyS: 'down', ArrowDown: 'down', Key
 window.addEventListener('keydown', (e) => {
   if (e.target instanceof HTMLInputElement) return; // typing in the debug panel
   if (e.code === 'Escape' && $('shopOv').classList.contains('on')) { e.preventDefault(); closeShop(); return; }
+  if (e.code === 'Escape' && $('albumOv').classList.contains('on')) { e.preventDefault(); closeAlbum(); return; }
   if (G.screen !== 'game') return;
   const dir = KEYMAP[e.code];
   if (dir) { keys.add(dir); e.preventDefault(); return; }
@@ -3571,6 +3968,11 @@ $('retreatBtn').addEventListener('click', () => { if (G.state === 'play' && pct(
 $('againBtn').addEventListener('click', () => { sfx('click'); startRun(); });
 $('backBtn').addEventListener('click', () => { sfx('click'); toTitle(); const c = cardFor(G.selected); if (c) c.focus({ preventScroll: true }); });
 $('shopBtn').addEventListener('click', () => { sfx('click'); openShop(); });
+$('albumBtn').addEventListener('click', () => { sfx('click'); openAlbum(); });
+$('albumClose').addEventListener('click', () => { sfx('click'); closeAlbum(); });
+$('albumOv').addEventListener('click', (e) => { if (e.target === e.currentTarget) closeAlbum(); });
+$('workPlay').addEventListener('click', () => { sfx('click'); if (!G.lastWork) return; useWorkStage(G.lastWork, G.lastWorkStage); startRun(); });
+$('workSave').addEventListener('click', () => { sfx('click'); if (G.lastWork) downloadWork(G.lastWork); });
 $('shopClose').addEventListener('click', () => { sfx('click'); closeShop(); });
 $('shopOv').addEventListener('click', (e) => { if (e.target === e.currentTarget) closeShop(); });
 $('startBtn').addEventListener('click', () => { try { window.SFX && window.SFX.unlock(); } catch (e) { /* ignore */ } sfx('click'); startRun(); });
@@ -3603,6 +4005,7 @@ function buildCards() {
     if (upload) b.querySelector('.ds').id = 'upDesc';
     b.addEventListener('click', () => {
       sfx('click');
+      if (id === 'album') { if (!G.stages.album || G.selected === 'album') openAlbum(); else selectStage('album'); return; }
       if (upload && (!G.stages.upload || G.selected === 'upload')) { $('file').value = ''; $('file').click(); if (!G.stages.upload) selectStage('upload'); return; }
       selectStage(id);
     });
@@ -3610,6 +4013,8 @@ function buildCards() {
   };
   for (const s of STAGES) mk(s.id, s.name, s.desc || '', false);
   mk('upload', '画像からつくる', '好きな画像を選ぶ', true);
+  mk('album', '画帖の絵', '遊んだ一戦が絵になる', true);
+  const al = cardFor('album'); al.querySelector('.ph').textContent = '画';
 }
 $('file').addEventListener('change', (e) => handleFile(e.target.files && e.target.files[0]));
 $('cfile').addEventListener('change', (e) => handleCharFile(e.target.files && e.target.files[0]));
@@ -3862,6 +4267,7 @@ function exposeDebug() { window.__dbg = {
     finally { G.forceInput = null; }
   },
   applyRestore, sealSpring,
+  get lastWork() { return G.lastWork; }, get lastWorkStage() { return G.lastWorkStage; }, workStage, paintWork, loadAlbum, saveWork, useWorkStage, workTitle,
   get heroFrame() { return heroFrame; },
   stageImages(k) { const st = G.stages[k]; return { color: st.colorCanvas.toDataURL(), gray: st.grayCanvas.toDataURL(), terrain: terrainCanvas(st).toDataURL() }; },
   buildFromCanvas(w, h, painter) { const c = makeCanvas(w, h); painter(c.getContext('2d'), w, h); return buildStage(c, w, h, { key: 'test', name: 'test' }); },
