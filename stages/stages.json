@@ -1,0 +1,26 @@
+[
+  {
+    "id": "shu_street",
+    "name": "朱の楼閣街",
+    "file": "shu_street.png",
+    "terrain": {
+      "floor": 59.83,
+      "water": 15.23,
+      "warm": 6.05,
+      "wall": 18.88,
+      "closed": 0.0
+    }
+  },
+  {
+    "id": "bamboo_path",
+    "name": "竹林の小径",
+    "file": "bamboo_path.png",
+    "terrain": {
+      "floor": 56.48,
+      "water": 15.1,
+      "warm": 6.18,
+      "wall": 22.23,
+      "closed": 0.0
+    }
+  }
+]
