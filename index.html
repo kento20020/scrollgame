@@ -177,6 +177,15 @@ button{font:inherit;color:inherit}
 .bar .bm{position:absolute;top:-4px;bottom:-4px;width:2px;margin-left:-1px;background:var(--shu)}
 .bar .bm span{position:absolute;top:100%;left:50%;transform:translateX(-50%);margin-top:2px;font-size:10px;line-height:1;color:var(--shu);white-space:nowrap}
 .pct{min-width:4ch;text-align:right;font-size:15px}
+.inkm{display:inline-flex;align-items:center;gap:5px;flex:none}
+.inkm .lbl{min-width:3em;text-align:right}
+.inkm[data-s="dense"] .lbl{color:var(--peony)}
+.inkm[data-s="boil"] .lbl{color:var(--shu)}
+.ibar{position:relative;display:block;width:44px;height:10px;background:var(--ink);border:1px solid var(--line)}
+.ifill{position:absolute;left:0;top:0;bottom:0;width:0;background:var(--muted)}
+.inkm[data-s="dense"] .ifill{background:var(--peony)}
+.inkm[data-s="boil"] .ifill{background:var(--shu)}
+.itk{position:absolute;top:-3px;bottom:-3px;width:1px;background:var(--paper);opacity:.7}
 .sub{justify-content:flex-end}
 .sub[hidden]{display:none}
 .bossbar{flex:1;display:flex;align-items:center;gap:8px;min-width:0}
@@ -341,10 +350,11 @@ button{font:inherit;color:inherit}
           <span class="lbl">復元率</span>
           <div class="bar" id="bar" role="progressbar" aria-label="復元率" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
             <div class="fill" id="fill"></div>
-            <i class="tk" style="left:15%"></i><i class="tk" style="left:30%"></i><i class="tk" style="left:45%"></i><i class="tk" style="left:60%"></i><i class="tk" style="left:75%"></i>
+            <i class="tk" style="left:15%"></i><i class="tk" style="left:30%"></i><i class="tk" style="left:45%"></i>
             <b class="bm" id="bossMark" style="left:75%"><span>ボス</span></b>
           </div>
           <span class="pct" id="pct">0%</span>
+          <span class="inkm" id="inkm" role="meter" aria-label="墨の濃さ" aria-valuemin="1" aria-valuemax="2.5" aria-valuenow="1" title="塗るほど残りの墨は濃くなる。祓うと薄まる"><span class="lbl" id="inkLbl">薄墨</span><span class="ibar"><span class="ifill" id="inkFill"></span><i class="itk" id="inkTk"></i></span></span>
         </div>
         <div class="hud-row pw" id="hudInfo"><span class="goal" id="goal"><b class="act" id="actName">序</b><span id="goalText"></span></span><span class="pwl" id="hudPw"></span></div>
         <div class="hud-row sub" id="hudSub" hidden>
@@ -1649,7 +1659,8 @@ const heroGeo = (H) => ({ top: (H * 40) / 54, bot: (H * 10) / 54, fan: (H * 26) 
 /* ════════════════════════════════════════════════════════════
    4. Run state
    ════════════════════════════════════════════════════════════ */
-const THRESHOLDS = [15, 30, 45, 60, 75];
+// 復元率 (%) that bring an upgrade; two more come when the ink turns 濃墨 and when 大墨 appears
+const THRESHOLDS = [15, 30, 45];
 const ENEMY = {
   blot: { hp: 2, spd: 30, r: 5, rr: 3 },
   wisp: { hp: 1, spd: 52, r: 4, rr: 2 },
@@ -1658,8 +1669,9 @@ const ENEMY = {
 // Pacing knobs. discBias: restore disc uses d² ≤ r² + discBias.
 // topUp: if a kill lands mostly on already-restored ground, the ripple keeps
 // going to the nearest gray cells until (topUp × disc size) new cells are restored.
-// bossAt: 復元率 (%) at which 大墨 appears. frontier: extra restore radius for a kill on the edge of her colour.
-const TUNE = { discBias: 1, topUp: 0.24, rrScale: 0.62, bossAt: 75, frontier: 1 };
+// frontier: extra restore radius for a kill on the edge of her colour.
+// bossAt: 復元率 (%) at which 大墨 comes at the latest where it is born from boiling ink (see INK).
+const TUNE = { discBias: 1, topUp: 0.24, rrScale: 0.62, bossAt: 90, frontier: 1 };
 // 筆で囲む: stepping off her colour into gray draws a brush line; stepping back onto colour closes it and fills
 // every gray pocket the line cut off (all but the biggest side), purifying the ink caught inside. Small ink
 // cannot cross the line; big ink and the boss break it, and so does a hit.
@@ -1673,6 +1685,19 @@ const SPRING = { count: 3, hp: 40, reach: 8, eatEvery: 0.7, spawnShare: 0.35 };
 // 色の力: restored cells of a family → power level; Lv1–5 at these counts × scale
 const HUE = { scale: 1 };
 const HUE_LV = [30, 90, 200, 380, 640];
+// 墨の濃さ: the picture holds a fixed amount of ink, one unit per cell of its ground. Restoring ground does not
+// remove it — the ink is pushed into the gray that is left, so the less gray, the darker it gets
+// (density = ink ÷ gray cells, 1 at the start).
+// Only purifying takes ink away: a kill or ink caught in a brush loop (`perKill`, big ink × `big`; a kill counts only
+// in the gray or at its edge — ink struck down deep in her colour seeps back), a sealed 墨溜まり (`spring` × all the
+// ink) and a landmark restored (`landmark` × all the ink).
+// From `dense` the gray is 濃墨: a kill's ripple reaches it only near the blast (reach + reachFar cells, narrowing to
+// `reach` as it nears `boil`), a brush loop only thins it (a second loop restores it), up to `bigMore` more big ink
+// comes, and it simmers — every second it stays 濃墨 the density creeps up by `simmer`, so it boils in the end.
+// At `boil` the ink boils into 大墨, whatever the template's own goal. The more ink is left then, the tougher it is
+// (ink left ÷ `ref` of all the ink, kept within bossMin–bossMax); each part of the goal left undone (a landmark,
+// a 墨溜まり) adds `goalHp`.
+const INK = { perKill: 1.5, big: 3, spring: 0.04, dense: 1.5, boil: 2.5, reach: 3, reachFar: 4, bigMore: 0.12, ref: 0.85, bossMin: 0.75, bossMax: 1.4, goalHp: 0.15, landmark: 0.05, simmer: 0.006 };
 
 // 工房 — permanent, deliberately small boosts bought with 香料 earned at the end of every run.
 // val(lv) is what the run uses (see newRun); stat + fmt(lv) is what the card shows.
@@ -1721,6 +1746,10 @@ function newRun(st) {
   const dImg = new ImageData(new Uint8ClampedArray(st.gray), st.AW, st.AH);
   dctx.putImageData(dImg, 0, 0);
   const gCanvas = makeCanvas(st.CW, st.CH), gctx = gCanvas.getContext('2d');
+  // 濃墨 overlay: one dark pixel per gray cell that is neither restored nor thinned
+  const kCanvas = makeCanvas(st.CW, st.CH), kctx = kCanvas.getContext('2d'), kImg = kctx.createImageData(st.CW, st.CH), inkRGB = rgb(C.ink);
+  for (let c = 0; c < st.N; c++) if (st.playable[c]) kImg.data.set([inkRGB[0], inkRGB[1], inkRGB[2], 255], c * 4);
+  kctx.putImageData(kImg, 0, 0);
   const unrest = new Int32Array(st.playableCount), pos = new Int32Array(st.N).fill(-1);
   let n = 0; for (let c = 0; c < st.N; c++) if (st.playable[c]) { unrest[n] = c; pos[c] = n; n++; }
   const ch = G.chars[G.char], bonus = runBonus(), hp = 5 + bonus.charm;
@@ -1737,7 +1766,9 @@ function newRun(st) {
     restored: new Uint8Array(st.N), queued: new Uint8Array(st.N), restoredPlayable: 0,
     unrest, unrestPos: pos, unrestN: n,
     dCanvas, dctx, dImg, dirty: false, gCanvas, gctx, gImg: gctx.createImageData(st.CW, st.CH), gDirty: false, glowAny: false,
-    nextThr: 0, pendingUp: 0, boss: null, bossSpawned: false, spawnAcc: 0.6, fireT: 0.4,
+    kCanvas, kctx, kImg, kDirty: false, thin: new Uint8Array(st.N), inkMass: st.playableCount, ink0: st.playableCount, rho: 1, dense: false,
+    denseAt: null, densePct: null, thinned: 0, bossInk: null, bossScale: 1, bossFrom: null, simmerT: 0,
+    nextThr: 0, pendingUp: 0, upWhy: [], boss: null, bossSpawned: false, spawnAcc: 0.6, fireT: 0.4,
     shake: 0, clearT: 0, cam: { x: 0, y: 0, w: 300, h: 300 },
   };
   if (tpl.setup) tpl.setup(run);
@@ -1782,31 +1813,33 @@ const ACT_SPAWN = [0.9, 1.1, 1.2]; // ink comes faster as the stage turns
 const TPL = { landmarks: 3, landmarkDone: 0.85, seals: 5, calm: 16, high: 7, floodHurt: 2.5 };
 const TPL_ORDER = ['full', 'meisho', 'fuuin', 'shio'];
 // every number the #debug panel can change, with its starting value
-const CFG = { BRUSH, SPRING, HUE, TUNE, TPL };
-const CFG_DEFAULT = { BRUSH: { ...BRUSH }, SPRING: { ...SPRING }, HUE: { ...HUE }, TUNE: { bossAt: TUNE.bossAt, frontier: TUNE.frontier }, TPL: { ...TPL } };
+const CFG = { BRUSH, SPRING, HUE, INK, TUNE, TPL };
+const CFG_DEFAULT = { BRUSH: { ...BRUSH }, SPRING: { ...SPRING }, HUE: { ...HUE }, INK: { ...INK }, TUNE: { bossAt: TUNE.bossAt, frontier: TUNE.frontier }, TPL: { ...TPL } };
 const TEMPLATES = {
   full: {
-    name: '全面復元', desc: '絵のすべてに色を還す。復元率が上がると大墨が現れる。', springs: 1, bossPct: true,
+    name: '全面復元', desc: '絵のすべてに色を還す。塗るほど残りの墨は濃くなり、煮詰まると大墨が現れる。', springs: 1, denseAct: true, // its 破 banner tells of the 濃墨
     acts: [
-      { next: () => pct() >= 30, enter: () => showBanner('破　墨が濃くなる') },
+      { next: (R) => R.dense, enter: () => showBanner('破　墨が濃くなった　灰色の中で祓う') },
       { next: (R) => R.bossSpawned },
     ],
-    goal: (R) => (R.bossSpawned ? '大墨を祓う' : `復元率 ${TUNE.bossAt}%で大墨`),
-    bossReady: (R, p) => p >= TUNE.bossAt,
+    goal: (R) => (R.bossSpawned ? '大墨を祓う' : R.dense ? '灰色の中で祓い、墨を煮詰める' : '色を広げる'),
+    bossReady: (R, p) => R.rho >= INK.boil || p >= TUNE.bossAt,
   },
   meisho: {
-    name: '名所めぐり', desc: '絵の名所を三つ還すと大墨が現れる。回る順番は自由。', springs: 0.67,
+    name: '名所めぐり', desc: '絵の名所を三つ還すと大墨が現れる。回る順番は自由。その前に墨が煮詰まると、残した名所の分だけ強い大墨が生まれる。', springs: 0.67,
+    denseTip: '煮詰まる前に名所を還す', unfinished: (R) => R.landmarks.filter((m) => !m.done).length, early: '名所を還しきる前に墨が煮詰まった',
     setup: (R) => { R.landmarks = makeLandmarks(R.stage); clearSpringsOffLandmarks(R); },
     acts: [
       { next: (R) => R.landmarks.some((m) => m.done), enter: (R) => { for (const q of R.springs) q.eatMul = 0.6; showBanner('破　墨溜まりが騒ぎだす'); } },
       { next: (R) => R.bossSpawned },
     ],
     goal: (R) => (R.bossSpawned ? '大墨を祓う' : `名所 ${R.landmarks.map((m) => (m.done ? '◆' : '◇')).join('')}`),
-    bossReady: (R, p) => R.landmarks.every((m) => m.done) || p >= 95,
+    bossReady: (R, p) => R.landmarks.every((m) => m.done) || R.rho >= INK.boil || p >= 95,
     update: (R) => updateLandmarks(R),
   },
   fuuin: {
-    name: '墨溜まり封じ', desc: '目覚めていく墨溜まりをすべて封じると大墨が現れる。', springCount: () => Math.round(TPL.seals),
+    name: '墨溜まり封じ', desc: '目覚めていく墨溜まりをすべて封じると大墨が現れる。その前に墨が煮詰まると、残した墨溜まりの分だけ強い大墨が生まれる。', springCount: () => Math.round(TPL.seals),
+    denseTip: '煮詰まる前に墨溜まりを封じる', unfinished: (R) => R.springs.filter((q) => !q.dead).length, early: '封じきる前に墨が煮詰まった',
     // more of them, so each is a little weaker; two awake at first
     setup: (R) => { R.springs.forEach((q, i) => { q.dormant = i >= 2; q.hp = q.maxHp = Math.max(1, Math.round(SPRING.hp * 0.65)); }); },
     acts: [
@@ -1814,17 +1847,17 @@ const TEMPLATES = {
       { next: (R) => R.springs.every((q) => q.dead || q.dormant) || R.t >= 150, enter: (R) => { if (wakeSprings(R, 99, true)) showBanner('急　大墨溜まりが目覚めた'); } },
     ],
     goal: (R) => (R.bossSpawned ? '大墨を祓う' : `墨溜まり 封印 ${R.sealed}/${R.springs.length}`),
-    bossReady: (R, p) => R.springs.every((q) => q.dead) || p >= 92,
+    bossReady: (R, p) => R.springs.every((q) => q.dead) || R.rho >= INK.boil || p >= 92,
   },
   shio: {
-    name: '潮の満ち引き', desc: '暗い低地から墨の潮が満ちる。色を還した場所には潮が来ない。', springs: 0.67, bossPct: true,
+    name: '潮の満ち引き', desc: '暗い低地から墨の潮が満ちる。色を還した場所には潮が来ない。墨が煮詰まると大墨が現れる。', springs: 0.67, denseTip: '灰色の中で祓う',
     setup: (R) => { R.tide = makeTide(R.stage); },
     acts: [
       { next: () => pct() >= 30, enter: (R) => { R.tide.q = 0.36; showBanner('破　潮が高くなる'); } },
       { next: (R) => R.bossSpawned, enter: (R) => { R.tide.q = 0.46; } },
     ],
     goal: (R) => tideText(R),
-    bossReady: (R, p) => p >= TUNE.bossAt,
+    bossReady: (R, p) => R.rho >= INK.boil || p >= TUNE.bossAt,
     update: (R, dt) => updateTide(R, dt),
   },
 };
@@ -1929,7 +1962,7 @@ function updateLandmarks(R) {
   }
 }
 function completeLandmark(R, m) {
-  m.done = true;
+  m.done = true; takeInk(INK.landmark * R.ink0);
   m.cells.forEach((c, i) => { if (!R.restored[c] && !R.queued[c]) queueRestore(c, 0.05 + (i / m.cells.length) * 0.4); });
   const P = R.p;
   if (P.hp < P.hpMax) { P.hp++; hudCache.hp = -1; }
@@ -2027,7 +2060,8 @@ const glowRGB = rgb(C.glowWarm);
 function applyRestore(c) {
   const R = run, st = R.stage;
   if (R.restored[c]) return;
-  R.restored[c] = 1;
+  R.restored[c] = 1; R.thin[c] = 0;
+  R.kImg.data[c * 4 + 3] = 0; R.kDirty = true;
   if (st.playable[c]) {
     R.restoredPlayable++;
     const p = R.unrestPos[c];
@@ -2048,6 +2082,7 @@ function applyUnrestore(c) {
   if (!R.restored[c]) return;
   R.restored[c] = 0; R.queued[c] = 0;
   if (st.playable[c]) {
+    R.kImg.data[c * 4 + 3] = 255; R.kDirty = true;
     R.restoredPlayable--;
     R.unrestPos[c] = R.unrestN; R.unrest[R.unrestN++] = c;
     if (st.fam[c] !== NOFAM) R.hue[st.fam[c]]--;
@@ -2078,11 +2113,13 @@ function restoreAt(x, y, rad, front) {
   // top-up: ripple on to the nearest still-gray playable cells
   const want = Math.floor(disc * (TUNE.topUp + R.bonus.ink)) - fresh;
   if (want > 0 && R.unrestN > 0) {
-    const cand = [];
+    const cand = [], f = R.dense ? clamp((R.rho - INK.dense) / Math.max(0.01, INK.boil - INK.dense), 0, 1) : 0;
+    const reachSq = (rad + INK.reach + (1 - f) * INK.reachFar) ** 2; // reach + reachFar as it turns 濃墨, down to reach when it boils
     for (let k = 0; k < R.unrestN; k++) {
       const c = R.unrest[k]; if (R.queued[c]) continue;
-      const ddx = (c % st.CW) - cx, ddy = ((c / st.CW) | 0) - cy;
-      cand.push(ddx * ddx + ddy * ddy, c);
+      const ddx = (c % st.CW) - cx, ddy = ((c / st.CW) | 0) - cy, d2 = ddx * ddx + ddy * ddy;
+      if (R.dense && !R.thin[c] && d2 > reachSq) continue; // 濃墨: the ripple only reaches it close by
+      cand.push(d2, c);
     }
     const idx = [];
     for (let k = 0; k < cand.length; k += 2) idx.push(k);
@@ -2119,6 +2156,25 @@ function updateSprings(dt) {
     R.parts.push({ x: ((best % st.CW) + 0.5) * CELL, y: (((best / st.CW) | 0) + 0.5) * CELL, vx: 0, vy: -10, life: 0.5, max: 0.5, kind: 'ink', s: 2 });
   }
 }
+/* ── 墨の濃さ ── */
+const inkOf = (e) => INK.perKill * (e.type === 'big' ? INK.big : 1);
+function takeInk(n) { const R = run; R.inkMass = Math.max(0, R.inkMass - n); }
+function thinCell(c) { const R = run; R.thin[c] = 1; R.kImg.data[c * 4 + 3] = 0; R.kDirty = true; }
+// density of the ink left in the gray; turning 濃墨 (and back, with a little slack so it doesn't flicker)
+function updateInk(dt) {
+  const R = run;
+  if (R.dense && !R.bossSpawned) R.simmerT += dt;
+  R.rho = R.inkMass / Math.max(1, R.unrestN) + R.simmerT * INK.simmer;
+  const was = R.dense;
+  if (!R.dense && R.rho >= INK.dense) R.dense = true;
+  else if (R.dense && R.rho < INK.dense - 0.1 && !R.bossSpawned) R.dense = false;
+  if (R.dense === was) return;
+  if (R.dense) {
+    if (R.denseAt == null) { R.denseAt = +R.t.toFixed(1); R.densePct = +pct().toFixed(1); R.pendingUp++; R.upWhy.push('墨が濃くなった'); } // the ink thickens, her fan grows stronger
+    if (!R.tpl.denseAct) showBanner(`墨が濃くなった　${R.tpl.denseTip || '灰色の中で祓う'}`);
+    sfx('hit', { vol: 0.8, pitch: -700 });
+  } else { showBanner('墨が薄まった'); sfx('heal'); }
+}
 function hurtSpring(s, dmg, brush) {
   if (s.dead || (s.dormant && !brush)) return; // blades pass over a sleeping spring; a brush stroke still wears it down
   s.hp -= dmg; s.flash = 0.1;
@@ -2128,6 +2184,7 @@ function sealSpring(s, brush) {
   const R = run;
   if (s.dead) return;
   s.dead = true; R.sealed++; R.sealTimes.push(+R.t.toFixed(1)); if (brush) R.sealedBrush++;
+  takeInk(INK.spring * R.ink0);
   restoreAt(s.x, s.y, 4);
   for (const e of R.enemies) if (!e.dead && !e.boss && Math.hypot(e.x - s.x, e.y - s.y) < 48) purify(e);
   burst(s.x, s.y, 16, 3);
@@ -2139,7 +2196,7 @@ function sealSpring(s, brush) {
 // ink removed without its own restore ripple (it sat inside ground that is being restored anyway)
 function purify(e) {
   if (e.dead) return;
-  e.dead = true; run.kills++;
+  e.dead = true; run.kills++; takeInk(inkOf(e));
   burst(e.x, e.y, 4, 2);
 }
 // a kill near the edge of her colour (both colour and gray within 2 cells) pushes the colour further
@@ -2257,14 +2314,15 @@ function closeTrail() {
     }
   }
   const mark = new Uint8Array(N);
-  let fresh = 0, sx = 0, sy = 0;
+  let fresh = 0, thinned = 0, sx = 0, sy = 0;
   fill.forEach((c, i) => {
     mark[c] = 1; sx += c % CW; sy += (c / CW) | 0;
     if (ownCell(c) || inkRing[c]) return;
+    if (R.dense && !R.thin[c] && st.playable[c]) { thinCell(c); thinned++; return; } // 濃墨: this loop only thins it
     if (st.playable[c]) fresh++;
     queueRestore(c, 0.04 + (i / fill.length) * 0.45);
   });
-  R.brushCells += fresh; R.strokes++;
+  R.brushCells += fresh; R.strokes++; R.thinned += thinned;
   // ink caught inside is purified; a 墨溜まり inside (or under the line) is worn down, not sealed outright
   let caught = 0;
   for (const e of R.enemies) if (!e.dead && !e.boss && mark[cellIndex(e.x, e.y)]) { purify(e); caught++; }
@@ -2273,6 +2331,7 @@ function closeTrail() {
   const cx = (sx / fill.length + 0.5) * CELL, cy = (sy / fill.length + 0.5) * CELL;
   if (!reduced) R.rings.push({ x: cx, y: cy, r: Math.sqrt(fill.length) * CELL * 0.7, t: 0, dur: 0.6, big: false, wet: true });
   if (fresh >= 10) R.parts.push({ x: cx, y: cy - 6, vx: 0, vy: -14, life: 1.2, max: 1.2, kind: 'txt', s: 0, text: caught ? `${fresh}マス・墨×${caught}` : `${fresh}マス` });
+  else if (thinned >= 6) R.parts.push({ x: cx, y: cy - 6, vx: 0, vy: -14, life: 1.2, max: 1.2, kind: 'txt', s: 0, text: `墨を薄めた ${thinned}マス` });
   if (tooBig) say('広すぎて囲めない');
   else if (leaky) say('囲いが開いている');
   sfx('restore'); if (caught) sfx('kill');
@@ -2391,7 +2450,7 @@ function spawnOne() {
   const t = run.t;
   let type = 'blot';
   const wW = t >= 60 ? 0.3 + 0.25 * Math.min(1, (t - 60) / 120) : 0;
-  const wB = t >= 120 ? 0.1 + 0.1 * Math.min(1, (t - 120) / 120) : 0;
+  const wB = (t >= 120 ? 0.1 + 0.1 * Math.min(1, (t - 120) / 120) : 0) + (run.dense ? INK.bigMore * clamp((run.rho - INK.dense) / Math.max(0.01, INK.boil - INK.dense), 0, 1) : 0);
   const roll = Math.random() * (1 + wW + wB);
   if (roll > 1 + wW) type = 'big'; else if (roll > 1) type = 'wisp';
   // part of the ink wells up from a living 墨溜まり (not one right next to her)
@@ -2414,10 +2473,14 @@ function spawnBoss() {
     if (d > bd) { bd = d; bx = x; by = y; }
   }
   if (bd < 0) { bx = P.x < st.W / 2 ? st.W - 10 : 10; by = P.y < st.H / 2 ? st.H - 10 : 10; }
-  const hp = Math.round(140 * Math.min(1.6, hpMult()));
+  R.bossInk = +(R.inkMass / R.ink0).toFixed(3); R.bossFrom = R.rho >= INK.boil ? 'boil' : 'goal';
+  const undone = R.tpl.unfinished ? R.tpl.unfinished(R) : 0;
+  R.bossScale = Math.min(1.8, clamp(R.bossInk / INK.ref, INK.bossMin, INK.bossMax) * (1 + INK.goalHp * Math.min(3, undone)));
+  const hp = Math.round(140 * Math.min(1.6, hpMult()) * R.bossScale);
   const b = { id: eid++, type: 'boss', x: bx, y: by, r: 18, spd: 24, hp, maxHp: hp, rr: 0, flash: 0, spawnT: 0.8, wT: 0, inWater: false, seed: 0, dead: false, boss: true, vx: 0, vy: 0, sumT: 4 };
-  R.enemies.push(b); R.boss = b;
-  showBanner('大墨が現れた');
+  R.enemies.push(b); R.boss = b; R.pendingUp++; R.upWhy.push('大墨が現れた');
+  const kind = R.bossScale >= 1.15 ? '濃い大墨' : R.bossScale <= 0.88 ? '薄い大墨' : '大墨';
+  showBanner(R.bossFrom === 'boil' ? (undone && R.tpl.early ? `${R.tpl.early}　${kind}が現れた` : `墨が煮詰まった　${kind}が現れた`) : `${kind}が現れた`);
   sfx('boss');
 }
 
@@ -2462,6 +2525,8 @@ function killEnemy(e) {
   burst(e.x, e.y, e.boss ? 24 : e.r > 6 ? 9 : 5, e.boss ? 3 : 2);
   if (e.boss) { bossDefeated(e); return; }
   const front = TUNE.frontier > 0 && onFrontier(e.x, e.y);
+  // ink purified in the gray or at its edge is gone; ink struck down deep in her colour seeps back into the gray
+  if (front || !R.restored[cellIndex(e.x, e.y)]) takeInk(inkOf(e));
   restoreAt(e.x, e.y, e.rr + R.up.echo + (front ? Math.round(TUNE.frontier) : 0), front);
   sfx('restore');
 }
@@ -2548,6 +2613,7 @@ function update(dt) {
 
   updateTrail();
   updateSprings(dt);
+  updateInk(dt);
   updateHue(dt);
   if (R.tpl.update) R.tpl.update(R, dt);
   if (G.state !== 'play') return; // the flood can end the run
@@ -2649,7 +2715,7 @@ function update(dt) {
 
   // ── progression ──
   const p = pct();
-  while (R.nextThr < THRESHOLDS.length && p >= THRESHOLDS[R.nextThr]) { R.nextThr++; R.pendingUp++; }
+  while (R.nextThr < THRESHOLDS.length && p >= THRESHOLDS[R.nextThr]) { R.upWhy.push(`復元率 ${THRESHOLDS[R.nextThr]}%`); R.nextThr++; R.pendingUp++; }
   if (R.pendingUp > 0) { openUpgrade(); return; }
   if (!R.bossSpawned && R.tpl.bossReady(R, p)) spawnBoss();
   updateActs(R);
@@ -2771,6 +2837,11 @@ function hash(a, b, c) {
   return (h ^ (h >>> 16)) >>> 0;
 }
 
+function inkDarkness(R) {
+  if (!R.dense) return 0.18 * clamp((R.rho - 1) / Math.max(0.01, INK.dense - 1), 0, 1);
+  const f = clamp((R.rho - INK.dense) / Math.max(0.01, INK.boil - INK.dense), 0, 1);
+  return 0.34 + 0.22 * f + (f > 0.6 && !reduced ? 0.04 * Math.sin(R.time * 4) : 0);
+}
 function render() {
   const R = run; if (!R) return;
   const st = R.stage, P = R.p, k = view.k, L = lctx;
@@ -2788,6 +2859,12 @@ function render() {
   if (R.gDirty) { R.gctx.putImageData(R.gImg, 0, 0); R.gDirty = false; }
   L.imageSmoothingEnabled = false;
   L.drawImage(R.dCanvas, 0, 0, st.W, st.H);
+  // 墨の濃さ: the gray darkens as the ink thickens; 濃墨 is plainly darker (thinned cells stay light)
+  const dark = inkDarkness(R);
+  if (dark > 0.01) {
+    if (R.kDirty) { R.kctx.putImageData(R.kImg, 0, 0); R.kDirty = false; }
+    L.globalAlpha = dark; L.drawImage(R.kCanvas, 0, 0, st.W, st.H); L.globalAlpha = 1;
+  }
 
   // restored 朱 glows faintly
   if (R.glowAny) {
@@ -3093,6 +3170,16 @@ function updateHud() {
     $('pct').textContent = `${p}%`;
     $('bar').setAttribute('aria-valuenow', String(p));
   }
+  // 墨の濃さ: 1 (start) … boil; the tick marks where 濃墨 begins
+  const inkF = Math.round(clamp((R.rho - 1) / Math.max(0.01, INK.boil - 1), 0, 1) * 40), inkS = R.bossFrom === 'boil' ? 'boil' : R.dense ? 'dense' : 'thin';
+  if (inkF !== hudCache.inkF || inkS !== hudCache.inkS) {
+    hudCache.inkF = inkF; hudCache.inkS = inkS;
+    const m = $('inkm'); m.dataset.s = inkS;
+    $('inkFill').style.width = `${(inkF / 40) * 100}%`;
+    $('inkLbl').textContent = inkS === 'boil' ? '煮詰まり' : inkS === 'dense' ? '濃墨' : '薄墨';
+    m.setAttribute('aria-valuenow', R.rho.toFixed(2)); m.setAttribute('aria-valuemax', String(INK.boil));
+    $('inkTk').style.left = `${clamp((INK.dense - 1) / Math.max(0.01, INK.boil - 1), 0, 1) * 100}%`;
+  }
   const showRetreat = pct() >= 60 && G.state !== 'clearing';
   const bossFrac = R.boss ? Math.max(0, R.boss.hp / R.boss.maxHp) : -1;
   if (showRetreat !== hudCache.retreat) { hudCache.retreat = showRetreat; $('retreatBtn').hidden = !showRetreat; }
@@ -3150,8 +3237,7 @@ function openUpgrade() {
     b.addEventListener('click', () => chooseUpgrade(i));
     box.appendChild(b);
   });
-  const thr = THRESHOLDS[run.nextThr - run.pendingUp] || THRESHOLDS[THRESHOLDS.length - 1];
-  $('upSub').textContent = `復元率 ${thr}% ― 強化をひとつ選ぶ（1・2・3キーでも選べる）`;
+  $('upSub').textContent = `${run.upWhy[0] || '風が強まる'} ― 強化をひとつ選ぶ（1・2・3キーでも選べる）`;
   $('upOv').classList.add('on');
   joy.active = false;
   const first = box.querySelector('button'); if (first) first.focus({ preventScroll: true });
@@ -3162,7 +3248,7 @@ function chooseUpgrade(i) {
   sfx('click');
   R.up[u.id]++;
   if (u.id === 'heart') { P.hpMax++; P.hp = P.hpMax; hudCache.hp = -1; }
-  R.pendingUp--;
+  R.pendingUp--; R.upWhy.shift();
   $('upOv').classList.remove('on');
   G.state = 'play';
   if (R.pendingUp > 0) openUpgrade();
@@ -3203,8 +3289,7 @@ function resume() {
 function startRun() {
   const st = G.stages[G.selected]; if (!st || !G.chars[G.char]) return;
   G.stage = st; newRun(st);
-  $('bossMark').style.left = `${clamp(TUNE.bossAt, 0, 100)}%`;
-  $('bossMark').hidden = !run.tpl.bossPct;
+  $('bossMark').hidden = true; // 大墨 comes from the ink now, not from a fixed 復元率
   for (const k in hudCache) hudCache[k] = k === 'clock' ? '' : (typeof hudCache[k] === 'number' ? -2 : null);
   $('upOv').classList.remove('on'); $('pauseOv').classList.remove('on'); $('banner').classList.remove('show');
   keys.clear(); joy.active = false;
@@ -3625,12 +3710,13 @@ function autoplay(seconds, god) {
     if (G.state === 'play' || G.state === 'clearing') update(dt);
     const p = pct();
     for (const m of [15, 30, 45, 60, 75, 85]) if (p >= m && out.marks[m] == null) out.marks[m] = +run.t.toFixed(1);
-    if (run.bossSpawned && out.boss == null) out.boss = +run.t.toFixed(1);
+    if (run.bossSpawned && out.boss == null) { out.boss = +run.t.toFixed(1); run.bossPctAt = +p.toFixed(1); }
   }
   G.bot = false; G.god = keepGod;
   const R = run, pc = (n) => +((n / R.stage.playableCount) * 100).toFixed(1);
   Object.assign(out, {
     t: +R.t.toFixed(1), pct: +pct().toFixed(1), kills: R.kills, hp: R.p.hp, state: G.state, enemies: R.enemies.length, up: { ...R.up },
+    dense: R.denseAt, densePct: R.densePct, rho: +R.rho.toFixed(2), bossInk: R.bossInk, bossScale: +R.bossScale.toFixed(2), bossPct: R.bossPctAt ?? null, thinned: R.thinned,
     brush: pc(R.brushCells), strokes: R.strokes, caught: R.caught, cuts: R.cuts, dries: R.dries, eroded: pc(R.eroded), sealed: R.sealed, sealedBrush: R.sealedBrush, firstSeal: R.sealTimes[0] ?? null, springs: R.springs.length, hueLv: Array.from(R.hueLv),
   });
   return out;
@@ -3659,8 +3745,21 @@ function buildDebug() {
     ['SPRING', 'reach', '色を食べる範囲', 'マス', 1],
     ['SPRING', 'eatEvery', '1マス食べる間隔', '秒', 0.1],
     ['SPRING', 'spawnShare', '墨溜まりから湧く割合', '', 0.05],
+    ['墨の濃さ'],
+    ['INK', 'perKill', '1体祓うと減る墨', 'マス分', 0.5],
+    ['INK', 'big', '大きい墨はその', '倍', 0.5],
+    ['INK', 'spring', '墨溜まりを封じると減る墨', '×全体', 0.01],
+    ['INK', 'dense', '濃墨になる濃さ', '倍', 0.1],
+    ['INK', 'boil', '煮詰まって大墨になる濃さ', '倍', 0.1],
+    ['INK', 'simmer', '濃墨が1秒ごとに煮詰まる量', '', 0.001],
+    ['INK', 'reach', '濃墨に波及が届く距離（煮詰まる直前）', 'マス', 1],
+    ['INK', 'reachFar', '濃墨になった直後に足す距離', 'マス', 1],
+    ['INK', 'bigMore', '濃墨で増える大きい墨', '', 0.02],
+    ['INK', 'ref', '大墨が標準の強さになる残りの墨', '×全体', 0.05],
+    ['INK', 'goalHp', '残した名所・墨溜まり1つで大墨が強まる', '', 0.05],
+    ['INK', 'landmark', '名所が還ると減る墨', '×全体', 0.01],
     ['進行'],
-    ['TUNE', 'bossAt', 'ボスが出る復元率', '%', 1],
+    ['TUNE', 'bossAt', '大墨が必ず出る復元率', '%', 1],
     ['TUNE', 'frontier', '境界で祓うと広がる', 'マス', 1],
     ['HUE', 'scale', '色の力に必要なマス数', '倍', 0.1],
     ['型'],
@@ -3706,7 +3805,6 @@ function buildDebug() {
       if (whole) v = Math.round(v);
       if (o === 'TUNE' && k === 'bossAt' && (v < 1 || v > 100)) return;
       CFG[o][k] = v; saveDebugTune();
-      if (o === 'TUNE' && k === 'bossAt' && run) $('bossMark').style.left = `${v}%`;
     } else if (el.dataset.flag) G[el.dataset.flag] = el.checked;
   });
   const pace = (loop) => {
@@ -3722,7 +3820,8 @@ function buildDebug() {
       out.textContent = `${st.name}・${run.tpl.name}・${loop ? '線で囲む' : '歩き続ける'}操作\n`
         + `ボス出現まで 平均 ${Math.round(avg((r) => r.boss))}秒（${rows.map((r) => (r.boss != null ? Math.round(r.boss) : '―')).join(' / ')}）　クリア ${Math.round(avg((r) => r.t))}秒\n`
         + `筆で囲んで戻した割合 ${avg((r) => r.brush).toFixed(1)}%（${Math.round(avg((r) => r.strokes))}回・墨 ${Math.round(avg((r) => r.caught))}体）\n`
-        + `墨溜まりの封印 ${avg((r) => r.sealed).toFixed(1)}/${rows[0].springs}　食べられた色 ${avg((r) => r.eroded).toFixed(1)}%`;
+        + `墨溜まりの封印 ${avg((r) => r.sealed).toFixed(1)}/${rows[0].springs}　食べられた色 ${avg((r) => r.eroded).toFixed(1)}%\n`
+        + `濃墨になった復元率 ${Math.round(avg((r) => r.densePct))}%　大墨が出た復元率 ${Math.round(avg((r) => r.bossPct))}%　大墨の強さ ${avg((r) => (r.boss != null ? r.bossScale : null)).toFixed(2)}倍`;
     }, 30);
   };
   box.addEventListener('click', (e) => {
@@ -3731,7 +3830,7 @@ function buildDebug() {
     if (act === 'cfgReset') { resetCfg(); saveDebugTune(); sync(); out.textContent = '初期値に戻した。'; }
     else if (act === 'cfgCopy') {
       const obj = (o) => JSON.stringify(o).replace(/"(\w+)":/g, '$1: ').replace(/,/g, ', ').replace(/^\{/, '{ ').replace(/\}$/, ' }');
-      const text = `const BRUSH = ${obj(BRUSH)};\nconst SPRING = ${obj(SPRING)};\nconst HUE = ${obj(HUE)};\nconst TPL = ${obj(TPL)};\nTUNE.bossAt = ${TUNE.bossAt}; TUNE.frontier = ${TUNE.frontier};`;
+      const text = `const BRUSH = ${obj(BRUSH)};\nconst SPRING = ${obj(SPRING)};\nconst HUE = ${obj(HUE)};\nconst TPL = ${obj(TPL)};\nconst INK = ${obj(INK)};\nTUNE.bossAt = ${TUNE.bossAt}; TUNE.frontier = ${TUNE.frontier};`;
       out.textContent = text;
       try { navigator.clipboard.writeText(text).then(() => { out.textContent = `${text}\n（コピーした）`; }, () => {}); } catch (err) { /* shown above */ }
     }
@@ -3746,7 +3845,7 @@ function buildDebug() {
 }
 
 function exposeDebug() { window.__dbg = {
-  G, get run() { return run; }, pct, TUNE, ENEMY, BRUSH, SPRING, HUE, CFG, META, SHOP, FAMS, stats: (k) => G.stages[k] && G.stages[k].stats,
+  G, get run() { return run; }, pct, TUNE, ENEMY, BRUSH, SPRING, HUE, INK, CFG, META, SHOP, FAMS, stats: (k) => G.stages[k] && G.stages[k].stats,
   start(key, tpl) { if (key) selectStage(key); if (tpl) G.tplSel[G.selected] = tpl; startRun(); },
   TEMPLATES, TPL, recommendTemplate,
   forcePct,
