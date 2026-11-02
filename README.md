@@ -217,6 +217,25 @@ python3 tools/make_mask.py stages/竹林.png    # → stages/竹林_mask.png（�
 - レイヤーは何枚でもかまいません。表示しているピクセルレイヤーを重ねたものが使われます（Pixelorama 1.0 以降の .pxo を読めます）
 - 最初の下書きは `python3 tools/make_aoi_pxo.py` で元の立ち絵から作っています（実行すると aoi.pxo を作り直すので、手で直したあとは実行しないでください）
 
+### ポーズ集の画像からキャラを作る
+
+いくつものポーズが無地の背景に並んだ1枚の画像（画像生成AIで作ったものなど）から、ポーズを自動で切り出してキャラクターにできます。
+
+```bash
+# 1. 見つかったポーズに番号を振った一覧を作る（characters/mai/poses.png）
+python3 tools/sheet_to_pxo.py ポーズ集.png --out characters/mai
+
+# 2. どのポーズをどの動きに使うか決めて、Pixelorama のプロジェクトと character.json を作る
+python3 tools/sheet_to_pxo.py ポーズ集.png --out characters/mai --name 舞 \
+    --map idle=0 attack=2,1 hurt=3 win=3,4,0 --lift 4=110 --windup 1 --height 72
+python3 build.py
+```
+
+- 背景は画像の外周の色とみなして抜きます。離れた部品（開いた扇、花びらの渦）は近いポーズにまとめます（`--join` で距離を変えられる）
+- どのポーズも足元が同じ位置にそろいます。跳んでいるポーズは `--lift 番号=画素` で持ち上げます
+- 歩きのコマがなければ、立ちポーズをゲームが自動で弾ませて歩かせます
+- できた .pxo は Pixelorama で開いて直せます
+
 ### character.json
 
 コマ絵や Pixelorama のプロジェクトがある場合は `characters/名前/character.json` で指定します（`characters/aoi/character.json` が見本です）。
