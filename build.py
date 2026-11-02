@@ -1,11 +1,15 @@
 #!/usr/bin/env python3
 """Inline stages, characters and sound effects into index.html (one self-contained file).
 
-Stages      every image in stages/ (except preview_* and *_mask) becomes a stage. stages/stages.json sets
-            the order, names, descriptions and the default 型 ("template": full / meisho / fuuin / shio);
+Stages      every image in stages/ (except preview_*, *_mask, *_ink and *_map) becomes a stage. stages/stages.json
+            sets the order, names, descriptions and the default 型 ("template": full / meisho / fuuin / shio);
             images not listed there are added after it, named by file. <stem>_mask.png (or "mask" in
             stages.json) is the gimmick mask: red 墨溜まり, yellow 名所, blue low ground, white high
             ground, green start (tools/make_mask.py writes a starter one).
+            Detailed art: "hd": true draws the picture at full detail instead of as 128-px pixel art.
+            <stem>_ink.* (or "ink") is the picture before its colour returns (made from the colour if
+            missing); <stem>_map.png (or "map") is the terrain in four flat colours — floor (141,136,123),
+            water (143,201,184), 朱 (208,83,58), wall (11,15,28) — used instead of reading it from colours.
 Characters  every folder in characters/ (and every lone image directly in characters/) becomes a
             playable character. characters/<id>/character.json is optional — without it the folder's
             sprite.* (or its first image) is used as a still, and the game animates it by itself.
@@ -41,7 +45,19 @@ def is_image(p: pathlib.Path) -> bool:
 
 
 def is_stage_image(p: pathlib.Path) -> bool:
-    return is_image(p) and not p.name.startswith("preview_") and not p.stem.endswith("_mask")
+    return is_image(p) and not p.name.startswith("preview_") and not p.stem.endswith(("_mask", "_ink", "_map"))
+
+
+def companion(e: dict, key: str, suffix: str):
+    """A stage's extra picture: named in stages.json, or <stem>_<suffix>.* next to it."""
+    if e.get(key):
+        return STAGES / e[key]
+    stem = pathlib.Path(e["file"]).stem
+    for ext in MIME:
+        p = STAGES / f"{stem}_{suffix}{ext}"
+        if p.is_file():
+            return p
+    return None
 
 
 def data_uri(path: pathlib.Path) -> str:
@@ -78,6 +94,14 @@ def stage_defs() -> list:
         mask = STAGES / e["mask"] if e.get("mask") else STAGES / f"{pathlib.Path(e['file']).stem}_mask.png"
         if e.get("mask") or mask.is_file():
             d["mask"] = data_uri(mask)
+        if e.get("hd"):
+            d["hd"] = True
+            ink = companion(e, "ink", "ink")
+            if ink:
+                d["ink"] = data_uri(ink)
+        tmap = companion(e, "map", "map")
+        if tmap:
+            d["map"] = data_uri(tmap)
         out.append(d)
     return out
 

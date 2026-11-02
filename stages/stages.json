@@ -1,5 +1,13 @@
 [
   {
+    "id": "shu_night",
+    "name": "灯籠の水辺",
+    "desc": "池に朱の大橋がかかる夜の街（細密画）",
+    "template": "fuuin",
+    "file": "shu_night.webp",
+    "hd": true
+  },
+  {
     "id": "shu_street",
     "name": "朱の楼閣街",
     "desc": "運河と灯籠の夜の街",

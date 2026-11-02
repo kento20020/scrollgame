@@ -265,6 +265,7 @@ button{font:inherit;color:inherit}
 .r-sub{margin:0;color:var(--muted);font-size:14px}
 .painting{position:relative;border:1px solid var(--line);background:var(--ink);padding:8px;border-radius:2px}
 .painting canvas{display:block;width:100%;height:auto;max-height:44vh;object-fit:contain;image-rendering:pixelated}
+.painting canvas.smooth,.card canvas.smooth{image-rendering:auto}
 .seal{position:absolute;right:14px;bottom:14px;width:66px;height:66px;background:var(--shu);color:var(--paper);display:grid;place-items:center;font-family:var(--font-title);font-size:44px;line-height:1;transform:rotate(-7deg);border-radius:3px;box-shadow:inset 0 0 0 4px var(--shu),inset 0 0 0 6px var(--paper);clip-path:polygon(1% 2%,97% 0,100% 96%,3% 100%);opacity:.95;animation:stamp .4s .35s cubic-bezier(.2,1.4,.4,1) both}
 .seal[hidden]{display:none}
 @keyframes stamp{from{transform:rotate(-7deg) scale(1.7);opacity:0}to{transform:rotate(-7deg) scale(1);opacity:.95}}
@@ -483,7 +484,7 @@ const CHARACTER_DEFS = /*{{CHARACTER_DEFS}}*/[];
 // kind 'procedural' → src is a function returning a canvas; kind 'image' → src is a URL / data URI.
 const STAGES = [
   { id: 'moon', name: '月夜の水庭', desc: '池と朱の橋の庭', kind: 'procedural', src: () => drawMoonGarden(), template: 'full' },
-  ...STAGE_DEFS.map((d) => ({ id: d.id, name: d.name, desc: d.desc, kind: 'image', src: d.src, template: d.template, mask: d.mask })),
+  ...STAGE_DEFS.map((d) => ({ id: d.id, name: d.name, desc: d.desc, kind: 'image', src: d.src, template: d.template, mask: d.mask, hd: !!d.hd, ink: d.ink, map: d.map })),
 ];
 
 // Sound hooks — window.SFX comes from the inlined sfx.js; a no-op if it is missing.
@@ -685,10 +686,12 @@ function buildStage(src, sw, sh, meta) {
     const v = rgbToHsl(r / 4, g / 4, b / 4), c = cy * CW + cx;
     hsl[c * 4] = v[0]; hsl[c * 4 + 1] = v[1]; hsl[c * 4 + 2] = v[2]; hsl[c * 4 + 3] = v[3];
   }
-  // classify; lower the darkness threshold until walls ≤ 35 %
+  // classify; lower the darkness threshold until walls ≤ 35 % — or take the terrain from a hand-made map
   const terrain = new Uint8Array(N);
   let wallT = 0.17;
-  for (;;) {
+  const mapped = meta.map ? readTerrainMap(meta.map, crop, CW, CH) : null;
+  if (mapped) terrain.set(mapped);
+  else for (;;) {
     let walls = 0;
     for (let c = 0; c < N; c++) {
       terrain[c] = classify(hsl[c * 4], hsl[c * 4 + 2], hsl[c * 4 + 3], wallT);
@@ -741,8 +744,46 @@ function buildStage(src, sw, sh, meta) {
   return {
     key: meta.key, name: meta.name, AW, AH, CW, CH, N, W: AW * ART_WORLD, H: AH * ART_WORLD,
     color, gray, colorCanvas, grayCanvas, terrain, playable, playableCount: count, spawnCell, stats, wallT, fam, height, famCount,
-    mask, tplDefault: meta.template || null,
+    mask, tplDefault: meta.template || null, hd: meta.hd ? hdPictures(meta.hd) : null,
   };
+}
+
+// Terrain map: a picture of the same shape as the stage painted in four flat colours (floor, water, 朱, wall);
+// each cell takes the colour most of its pixels are nearest to. For detailed art, where shadows and outlines
+// would read as walls, the map says what is walkable instead of the colours.
+const MAP_KINDS = [[T_FLOOR, [141, 136, 123]], [T_WATER, [143, 201, 184]], [T_WARM, [208, 83, 58]], [T_WALL, [11, 15, 28]]];
+function readTerrainMap(img, crop, CW, CH) {
+  const iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height;
+  const cw = crop[2] * iw, ch = crop[3] * ih, f = Math.min(1, 512 / Math.max(cw, ch));
+  const MW = Math.max(1, Math.round(cw * f)), MH = Math.max(1, Math.round(ch * f));
+  const cv2 = makeCanvas(MW, MH), g = cv2.getContext('2d', { willReadFrequently: true });
+  g.imageSmoothingEnabled = false;
+  g.drawImage(img, crop[0] * iw, crop[1] * ih, cw, ch, 0, 0, MW, MH);
+  const d = g.getImageData(0, 0, MW, MH).data, N = CW * CH, votes = new Uint16Array(N * 4), out = new Uint8Array(N);
+  for (let y = 0; y < MH; y++) for (let x = 0; x < MW; x++) {
+    const i = (y * MW + x) * 4;
+    let best = 0, bd = Infinity;
+    for (let k = 0; k < 4; k++) { const t = MAP_KINDS[k][1], dd = Math.abs(d[i] - t[0]) + Math.abs(d[i + 1] - t[1]) + Math.abs(d[i + 2] - t[2]); if (dd < bd) { bd = dd; best = k; } }
+    votes[(Math.floor((y * CH) / MH) * CW + Math.floor((x * CW) / MW)) * 4 + best]++;
+  }
+  for (let c = 0; c < N; c++) { let b = 0; for (let k = 1; k < 4; k++) if (votes[c * 4 + k] > votes[c * 4 + b]) b = k; out[c] = MAP_KINDS[b][0]; }
+  return out;
+}
+
+// Detailed stage art (stages.json "hd"): the colour picture, and the ink picture shown before its colour
+// returns — painted by hand, or made here from the colour by mapping its lightness onto the ink-wash ramp.
+function hdPictures({ color, ink }) {
+  if (!ink) {
+    const w = color.naturalWidth || color.width, h = color.naturalHeight || color.height, c = makeCanvas(w, h), g = c.getContext('2d', { willReadFrequently: true });
+    g.drawImage(color, 0, 0, w, h);
+    const id = g.getImageData(0, 0, w, h), d = id.data, lo = rgb(C.grayLo), hi = rgb(C.grayHi);
+    for (let i = 0; i < d.length; i += 4) {
+      const L = (0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]) / 255;
+      for (let k = 0; k < 3; k++) d[i + k] = (lo[k] + (hi[k] - lo[k]) * L) * 0.85;
+    }
+    g.putImageData(id, 0, 0); ink = c;
+  }
+  return { color, ink, w: color.naturalWidth || color.width, h: color.naturalHeight || color.height };
 }
 
 // Gimmick mask: a picture of the same shape as the stage, painted in pure colours — red 墨溜まり (one per
@@ -1338,7 +1379,7 @@ function newRun(st) {
     enemies: [], blades: [], parts: [], rings: [], queue: [],
     restored: new Uint8Array(st.N), queued: new Uint8Array(st.N), restoredPlayable: 0,
     unrest, unrestPos: pos, unrestN: n,
-    dCanvas, dctx, dImg, dirty: false, gCanvas, gctx, gImg: gctx.createImageData(st.CW, st.CH), gDirty: false, glowAny: false,
+    hd: hdInit(st), dCanvas, dctx, dImg, dirty: false, gCanvas, gctx, gImg: gctx.createImageData(st.CW, st.CH), gDirty: false, glowAny: false,
     kCanvas, kctx, kImg, kDirty: false, thin: new Uint8Array(st.N), inkMass: st.playableCount, ink0: st.playableCount, rho: 1, dense: false,
     denseAt: null, densePct: null, thinned: 0, bossInk: null, bossScale: 1, bossFrom: null, simmerT: 0,
     rec: newRecord(st),
@@ -1629,12 +1670,80 @@ const cellIndex = (x, y) => {
   return clamp(Math.floor(y / CELL), 0, st.CH - 1) * st.CW + clamp(Math.floor(x / CELL), 0, st.CW - 1);
 };
 
+/* ── detailed stage art ──
+   The game still thinks in 8-px cells; only the picture is drawn at full detail. A composite canvas holds the
+   ink picture with the colour picture laid over it through a reveal mask (4×4 mask pixels per cell): its edge
+   is the cells' restored state, smoothed, then broken up by a fixed grain so it reads like a brush's ragged edge
+   rather than a grid. Walls and sealed pockets are never restored during play, so they take their colour from
+   the share of playable cells around them that have been — a house colours as the street round it does. */
+const HD_SUB = 4, HD_NEAR = 3;
+function hdInit(st) {
+  const P = st.hd; if (!P) return null;
+  const comp = makeCanvas(P.w, P.h), cg = comp.getContext('2d');
+  cg.drawImage(P.ink, 0, 0, P.w, P.h);
+  const MW = st.CW * HD_SUB, MH = st.CH * HD_SUB, mask = makeCanvas(MW, MH), tmp = makeCanvas(P.w, P.h);
+  const grain = new Float32Array(MW * MH);
+  for (let y = 0; y < MH; y++) for (let x = 0; x < MW; x++) grain[y * MW + x] = 0.6 * (hash(x, y, 7) / 4294967296) + 0.4 * (hash(x >> 2, y >> 2, 11) / 4294967296);
+  return { comp, cg, mask, mg: mask.getContext('2d'), tmp, tg: tmp.getContext('2d'), MW, MH, grain, a: new Float32Array(st.N), box: null };
+}
+function hdMark(R, c) {
+  const H = R.hd; if (!H) return;
+  const CW = R.stage.CW, x = c % CW, y = (c / CW) | 0, b = H.box;
+  if (!b) H.box = [x, y, x, y];
+  else { if (x < b[0]) b[0] = x; if (y < b[1]) b[1] = y; if (x > b[2]) b[2] = x; if (y > b[3]) b[3] = y; }
+}
+function hdFlush(R, now) {
+  const H = R.hd; if (!H || !H.box) return;
+  const st = R.stage, P = st.hd, CW = st.CW, CHn = st.CH, S = HD_SUB, A = H.a;
+  const [bx0, by0, bx1, by1] = H.box;
+  // the final wave recolours most of the picture every frame: at most ~8 big recomposites a second
+  const big = (bx1 - bx0 + 1) * (by1 - by0 + 1) > st.N * 0.25;
+  if (big && now != null && now - (H.bigAt ?? -9) < 0.12) return;
+  if (big) H.bigAt = now;
+  H.box = null;
+  // cell alphas (a wall's depends on its neighbours, so the changed box grows by HD_NEAR)
+  const ax0 = Math.max(0, bx0 - HD_NEAR), ay0 = Math.max(0, by0 - HD_NEAR), ax1 = Math.min(CW - 1, bx1 + HD_NEAR), ay1 = Math.min(CHn - 1, by1 + HD_NEAR);
+  for (let y = ay0; y <= ay1; y++) for (let x = ax0; x <= ax1; x++) {
+    const c = y * CW + x;
+    if (st.playable[c] || R.restored[c]) { A[c] = R.restored[c] ? 1 : 0; continue; }
+    let got = 0, all = 0;
+    for (let yy = Math.max(0, y - HD_NEAR); yy <= Math.min(CHn - 1, y + HD_NEAR); yy++) for (let xx = Math.max(0, x - HD_NEAR); xx <= Math.min(CW - 1, x + HD_NEAR); xx++) {
+      const m = yy * CW + xx; if (st.playable[m]) { all++; if (R.restored[m]) got++; }
+    }
+    A[c] = all ? got / all : 0;
+  }
+  // the mask over those cells (one more cell round them: the smoothing reaches that far)
+  const cx0 = Math.max(0, ax0 - 1), cy0 = Math.max(0, ay0 - 1), cx1 = Math.min(CW - 1, ax1 + 1), cy1 = Math.min(CHn - 1, ay1 + 1);
+  const mx0 = cx0 * S, my0 = cy0 * S, mw = (cx1 - cx0 + 1) * S, mh = (cy1 - cy0 + 1) * S;
+  const id = H.mg.createImageData(mw, mh), d = id.data;
+  for (let y = 0; y < mh; y++) {
+    const v = (my0 + y + 0.5) / S - 0.5, j0 = Math.floor(v), fv = v - j0, r0 = clamp(j0, 0, CHn - 1) * CW, r1 = clamp(j0 + 1, 0, CHn - 1) * CW;
+    for (let x = 0; x < mw; x++) {
+      const u = (mx0 + x + 0.5) / S - 0.5, i0 = Math.floor(u), fu = u - i0, c0 = clamp(i0, 0, CW - 1), c1 = clamp(i0 + 1, 0, CW - 1);
+      const a = (A[r0 + c0] * (1 - fu) + A[r0 + c1] * fu) * (1 - fv) + (A[r1 + c0] * (1 - fu) + A[r1 + c1] * fu) * fv;
+      const t = clamp((a + (H.grain[(my0 + y) * H.MW + mx0 + x] - 0.5) * 0.55 - 0.38) / 0.24, 0, 1);
+      const o = (y * mw + x) * 4; d[o] = d[o + 1] = d[o + 2] = 255; d[o + 3] = t * t * (3 - 2 * t) * 255;
+    }
+  }
+  H.mg.putImageData(id, mx0, my0);
+  // recomposite that part of the picture: ink, then the colour through the mask
+  const fx = P.w / H.MW, fy = P.h / H.MH;
+  const px = Math.floor(mx0 * fx), py = Math.floor(my0 * fy), pw = Math.min(P.w, Math.ceil((mx0 + mw) * fx)) - px, ph = Math.min(P.h, Math.ceil((my0 + mh) * fy)) - py;
+  const tg = H.tg;
+  tg.globalCompositeOperation = 'copy'; tg.drawImage(P.color, px, py, pw, ph, px, py, pw, ph);
+  tg.globalCompositeOperation = 'destination-in'; tg.imageSmoothingEnabled = true; tg.imageSmoothingQuality = 'high';
+  tg.drawImage(H.mask, px / fx, py / fy, pw / fx, ph / fy, px, py, pw, ph);
+  tg.globalCompositeOperation = 'source-over';
+  H.cg.drawImage(P.ink, px, py, pw, ph, px, py, pw, ph);
+  H.cg.drawImage(H.tmp, px, py, pw, ph, px, py, pw, ph);
+}
+
 /* ── restoration ── */
 const glowRGB = rgb(C.glowWarm);
 function applyRestore(c) {
   const R = run, st = R.stage;
   if (R.restored[c]) return;
-  R.restored[c] = 1; R.thin[c] = 0;
+  R.restored[c] = 1; R.thin[c] = 0; hdMark(R, c);
   R.kImg.data[c * 4 + 3] = 0; R.kDirty = true;
   if (st.playable[c]) {
     R.restoredPlayable++;
@@ -1654,7 +1763,7 @@ function applyRestore(c) {
 function applyUnrestore(c) {
   const R = run, st = R.stage;
   if (!R.restored[c]) return;
-  R.restored[c] = 0; R.queued[c] = 0;
+  R.restored[c] = 0; R.queued[c] = 0; hdMark(R, c);
   if (st.playable[c]) {
     R.kImg.data[c * 4 + 3] = 255; R.kDirty = true;
     R.restoredPlayable--;
@@ -2740,23 +2849,23 @@ function render() {
   const ix = Math.floor(cx), iy = Math.floor(cy), fx = cx - ix, fy = cy - iy;
   const lw = low.width, lh = low.height;
 
+  // detailed art (R.hd) is drawn straight onto the screen below; the low-res layer then only carries the marks
+  const hd = R.hd;
   L.setTransform(1, 0, 0, 1, 0, 0);
   L.globalAlpha = 1; L.globalCompositeOperation = 'source-over';
-  L.fillStyle = C.ink; L.fillRect(0, 0, lw, lh);
+  if (hd) L.clearRect(0, 0, lw, lh); else { L.fillStyle = C.ink; L.fillRect(0, 0, lw, lh); }
   L.setTransform(1, 0, 0, 1, -ix, -iy);
   if (R.dirty) { R.dctx.putImageData(R.dImg, 0, 0); R.dirty = false; }
   if (R.gDirty) { R.gctx.putImageData(R.gImg, 0, 0); R.gDirty = false; }
   L.imageSmoothingEnabled = false;
-  L.drawImage(R.dCanvas, 0, 0, st.W, st.H);
+  if (!hd) L.drawImage(R.dCanvas, 0, 0, st.W, st.H);
   // 墨の濃さ: the gray darkens as the ink thickens; 濃墨 is plainly darker (thinned cells stay light)
   const dark = inkDarkness(R);
-  if (dark > 0.01) {
-    if (R.kDirty) { R.kctx.putImageData(R.kImg, 0, 0); R.kDirty = false; }
-    L.globalAlpha = dark; L.drawImage(R.kCanvas, 0, 0, st.W, st.H); L.globalAlpha = 1;
-  }
+  if (dark > 0.01 && R.kDirty) { R.kctx.putImageData(R.kImg, 0, 0); R.kDirty = false; }
+  if (dark > 0.01 && !hd) { L.globalAlpha = dark; L.drawImage(R.kCanvas, 0, 0, st.W, st.H); L.globalAlpha = 1; }
 
   // restored 朱 glows faintly
-  if (R.glowAny) {
+  if (R.glowAny && !hd) {
     L.save(); L.globalCompositeOperation = 'lighter'; L.globalAlpha = 0.16 + 0.06 * Math.sin(R.time * 2.2);
     L.imageSmoothingEnabled = true; L.drawImage(R.gCanvas, 0, 0, st.W, st.H); L.restore();
     L.imageSmoothingEnabled = false;
@@ -2870,6 +2979,18 @@ function render() {
   ctx.imageSmoothingEnabled = false;
   ctx.fillStyle = C.ink; ctx.fillRect(0, 0, cv.width, cv.height);
   const ox = Math.round(-fx * k), oy = Math.round(-fy * k);
+  if (hd) {
+    hdFlush(R, R.time);
+    ctx.setTransform(k, 0, 0, k, ox - ix * k, oy - iy * k);
+    ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'low'; // it is only ever enlarged a little
+    // only the part on screen: world rect → picture rect
+    const P = st.hd, sx = P.w / st.W, sy = P.h / st.H;
+    const wx0 = clamp(ix - 1, 0, st.W), wy0 = clamp(iy - 1, 0, st.H), wx1 = clamp(ix + lw + 1, 0, st.W), wy1 = clamp(iy + lh + 1, 0, st.H);
+    if (wx1 > wx0 && wy1 > wy0) ctx.drawImage(hd.comp, wx0 * sx, wy0 * sy, (wx1 - wx0) * sx, (wy1 - wy0) * sy, wx0, wy0, wx1 - wx0, wy1 - wy0);
+    if (dark > 0.01) { ctx.globalAlpha = dark; ctx.drawImage(R.kCanvas, 0, 0, st.W, st.H); ctx.globalAlpha = 1; }
+    if (R.glowAny) { ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.16 + 0.06 * Math.sin(R.time * 2.2); ctx.drawImage(R.gCanvas, 0, 0, st.W, st.H); ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over'; }
+    ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.imageSmoothingEnabled = false;
+  }
   ctx.drawImage(low, 0, 0, lw, lh, ox, oy, lw * k, lh * k);
 
   // Entities go straight onto the screen canvas with the same world → device mapping as the blit, so pixel
@@ -3236,8 +3357,10 @@ function endRun(kind) {
   $('rRec').innerHTML = kind === 'death' ? `${rec}% <small>半減</small>` : `${rec}%`;
   $('rBest').hidden = !(isBest && rec > 0);
   if (R.dirty) { R.dctx.putImageData(R.dImg, 0, 0); R.dirty = false; }
-  const rc = $('rCanvas'); rc.width = st.W; rc.height = st.H;
-  const g = rc.getContext('2d'); g.imageSmoothingEnabled = false; g.drawImage(R.dCanvas, 0, 0, st.W, st.H);
+  const rc = $('rCanvas');
+  if (R.hd) { hdFlush(R); rc.width = R.hd.comp.width; rc.height = R.hd.comp.height; rc.getContext('2d').drawImage(R.hd.comp, 0, 0); }
+  else { rc.width = st.W; rc.height = st.H; const g = rc.getContext('2d'); g.imageSmoothingEnabled = false; g.drawImage(R.dCanvas, 0, 0, st.W, st.H); }
+  rc.classList.toggle('smooth', !!R.hd);
   // 連作: the run is painted into the next picture
   R.rec.end = [R.p.x, R.p.y];
   const work = makeWork(R, kind);
@@ -3251,10 +3374,11 @@ function endRun(kind) {
 }
 
 /* ── title / stage select ── */
-function drawCover(canvas, src) {
+function drawCover(canvas, src, smooth) {
   const g = canvas.getContext('2d'), W = canvas.width, H = canvas.height;
-  g.imageSmoothingEnabled = false; g.fillStyle = C.ink; g.fillRect(0, 0, W, H);
-  const s = Math.max(W / src.width, H / src.height), w = src.width * s, h = src.height * s;
+  g.imageSmoothingEnabled = !!smooth; g.imageSmoothingQuality = 'high'; g.fillStyle = C.ink; g.fillRect(0, 0, W, H);
+  const sw = src.naturalWidth || src.width, sh = src.naturalHeight || src.height;
+  const s = Math.max(W / sw, H / sh), w = sw * s, h = sh * s;
   g.drawImage(src, (W - w) / 2, (H - h) / 2, w, h);
 }
 function cardFor(key) { return document.querySelector(`.card[data-stage="${key}"]`); }
@@ -3622,15 +3746,20 @@ function boot() {
   loadMeta(); updateWallet();
   prepSmall(); prepBlobs(); prepBlades();
   buildCards(); buildCharCards();
-  const ready = (def, src, w, h, mask) => {
-    G.stages[def.id] = buildStage(src, w, h, { key: def.id, name: def.name, template: def.template, mask });
-    drawCover(cardFor(def.id).querySelector('canvas'), G.stages[def.id].colorCanvas);
+  const ready = (def, src, w, h, mask, ink, map) => {
+    G.stages[def.id] = buildStage(src, w, h, { key: def.id, name: def.name, template: def.template, mask, map, hd: def.hd ? { color: src, ink } : null });
+    const st = G.stages[def.id];
+    const cc = cardFor(def.id).querySelector('canvas');
+    cc.classList.toggle('smooth', !!st.hd); drawCover(cc, st.hd ? st.hd.color : st.colorCanvas, !!st.hd);
     if (G.selected === def.id) renderPreview();
   };
   G.selected = STAGES[0].id;
   for (const def of STAGES) {
     if (def.kind === 'procedural') { const c = def.src(); ready(def, c, c.width, c.height); }
-    else Promise.all([loadImg(def.src), def.mask ? loadImg(def.mask).catch(() => null) : null]).then(([img, mask]) => ready(def, img, img.naturalWidth, img.naturalHeight, mask)).catch(() => {});
+    else {
+      const opt = (u) => (u ? loadImg(u).catch(() => null) : null);
+      Promise.all([loadImg(def.src), opt(def.mask), opt(def.ink), opt(def.map)]).then(([img, mask, ink, map]) => ready(def, img, img.naturalWidth, img.naturalHeight, mask, ink, map)).catch(() => {});
+    }
   }
   selectStage(G.selected);
   const saved = store.get(CHAR_KEY);
@@ -3840,6 +3969,7 @@ function exposeDebug() { window.__dbg = {
   killBoss() { if (run.boss) { hurtEnemy(run.boss, 1e9); } },
   chooseUpgrade, pause, resume, selectChar, toTitle,
   setGod(v) { G.god = !!v; },
+  hdFlush(R) { hdFlush(R || run); },
   // loop: the bot closes its brush lines and goes after 墨溜まり
   autoplay(seconds, god, loop) { G.botLoop = !!loop; try { return autoplay(seconds, god); } finally { G.botLoop = false; } },
   // run the game for `seconds` with a fixed stick input [x, y] (tests)
