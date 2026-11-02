@@ -1662,12 +1662,13 @@ function cutout(img) {
 }
 
 // actions a character can have drawn (a sheet each; only walk is required): standing still, walking, the fan
-// swing, being hit, and the win after 大墨 falls. `durs` (seconds per frame) comes from a Pixelorama project.
-const ANIMS = ['idle', 'walk', 'attack', 'hurt', 'win'];
+// swing (and a second swing, used on every other gust), being hit, and the win after 大墨 falls.
+// `durs` (seconds per frame) comes from a Pixelorama project.
+const ANIMS = ['idle', 'walk', 'attack', 'attack2', 'hurt', 'win'];
 const ANIM_DT = { idle: 0.25, walk: 0.15, hurt: 0.15, win: 0.2 };
 function animDurs(spec, n, name) {
   if (spec && Array.isArray(spec.durs) && spec.durs.length === n && spec.durs.every((v) => v > 0)) return spec.durs.map(Number);
-  if (name === 'attack') return n === 2 ? [ATK_F0, ATK_F1] : Array(n).fill((ATK_F0 + ATK_F1) / n);
+  if (name === 'attack' || name === 'attack2') return n === 2 ? [ATK_F0, ATK_F1] : Array(n).fill((ATK_F0 + ATK_F1) / n);
   return Array(n).fill((spec && Number(spec.dt)) || ANIM_DT[name] || 0.15);
 }
 // which frame of a timed sequence is showing `t` seconds in (looping, or holding the last frame)
@@ -1684,7 +1685,7 @@ function makeCharacter(def, imgs) {
   if (def.walk && imgs.walk) {
     walk = sliceSheet(imgs.walk, Math.max(1, def.walk.frames | 0));
     if (def.attack && imgs.attack) attack = sliceSheet(imgs.attack, Math.max(1, def.attack.frames | 0));
-    for (const k of ['idle', 'hurt', 'win']) if (def[k] && imgs[k]) extra[k] = sliceSheet(imgs[k], Math.max(1, def[k].frames | 0));
+    for (const k of ['idle', 'attack2', 'hurt', 'win']) if (def[k] && imgs[k]) extra[k] = sliceSheet(imgs[k], Math.max(1, def[k].frames | 0));
     [ax, ay] = Array.isArray(def.feet) ? def.feet.map(Number) : [walk[0].width / 2, walk[0].height];
   } else {
     const cut = cutout(imgs.sprite);
@@ -3445,11 +3446,14 @@ function drawPlayer(g) {
   }
   if (P.inv > 0 && P.inv < 0.88 && G.state === 'play' && Math.floor(P.inv * 14) % 2 === 0) return; // blink
   const A = CH.anims, sum = (l) => l.reduce((a, v) => a + v, 0);
-  // the attack sheet may open with wind-up frames, shown while the next gust is about to leave
-  const wu = A.attack ? Math.min(CH.windup, A.attack.frames.length - 1) : 0;
-  const strike = A.attack ? A.attack.durs.slice(wu) : null, atkLen = A.attack ? sum(strike) : ATK_F0 + ATK_F1;
+  // the attack sheet may open with wind-up frames, shown while the next gust is about to leave; with a second
+  // attack drawn, the gusts alternate between them (the current one by the volley count, the next by +1)
+  const atkOf = (n) => (A.attack2 && n % 2 === 1 ? 'attack2' : 'attack');
+  const curAtk = atkOf(R.volley || 0), nextAtk = atkOf((R.volley || 0) + 1), AT = A[curAtk], AN = A[nextAtk];
+  const wu = AT ? Math.min(CH.windup, AT.frames.length - 1) : 0, wuN = AN ? Math.min(CH.windup, AN.frames.length - 1) : 0;
+  const strike = AT ? AT.durs.slice(wu) : null, atkLen = AT ? sum(strike) : ATK_F0 + ATK_F1;
   const since = R.time - P.fireAt, swing = since >= 0 && since < atkLen;
-  const winding = wu > 0 && !swing && G.state === 'play' && R.fireT > 0 && R.fireT < sum(A.attack.durs.slice(0, wu));
+  const winding = wuN > 0 && !swing && G.state === 'play' && R.fireT > 0 && R.fireT < sum(AN.durs.slice(0, wuN));
   const white = P.inv > 0.88 && G.state === 'play';
   const flip = CH.faces === 'left' ? P.facing > 0 : P.facing < 0;
   const attacking = swing && !!CH.attack;
@@ -3458,8 +3462,8 @@ function drawPlayer(g) {
   const hurtFor = A.hurt ? sum(A.hurt.durs) : 0;
   if (G.state === 'clearing' && A.win) { anim = 'win'; f = frameAt(A.win.durs, R.time - (R.clearAt ?? R.time), false); }
   else if (A.hurt && R.hurtAt != null && R.time - R.hurtAt < hurtFor) { anim = 'hurt'; f = frameAt(A.hurt.durs, R.time - R.hurtAt, false); }
-  else if (attacking) { anim = 'attack'; f = wu + frameAt(strike, since, false); }
-  else if (winding) { anim = 'attack'; f = frameAt(A.attack.durs.slice(0, wu), sum(A.attack.durs.slice(0, wu)) - R.fireT, false); }
+  else if (attacking) { anim = curAtk; f = wu + frameAt(strike, since, false); }
+  else if (winding) { anim = nextAtk; f = frameAt(AN.durs.slice(0, wuN), sum(AN.durs.slice(0, wuN)) - R.fireT, false); }
   if (!CH.procedural) {
     if (anim === 'walk' && P.moving) f = CH.loop[Math.floor(R.time / CH.dt) % CH.loop.length];
     else if (anim === 'walk' && A.idle) { anim = 'idle'; f = frameAt(A.idle.durs, R.time, true); }
@@ -3472,7 +3476,7 @@ function drawPlayer(g) {
     sx = 1 + (1 - sy) * 0.6;
     if (CH.pixel) { bob = Math.round(bob); rot = 0; sx = sy = 1; } // pixel stills only hop
   }
-  heroFrame = ({ idle: 'i', walk: 'w', attack: 'a', hurt: 'h', win: 'v' })[anim] + f;
+  heroFrame = ({ idle: 'i', walk: 'w', attack: 'a', attack2: 'b', hurt: 'h', win: 'v' })[anim] + f;
   if (CH.pixel) {
     const img = (white ? A[anim].white : A[anim].frames)[f], s = CH.s;
     g.save(); g.translate(Math.round(P.x), Math.round(P.y) + 1 - bob);

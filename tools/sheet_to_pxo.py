@@ -8,6 +8,10 @@
     python3 tools/sheet_to_pxo.py sheet.png --out characters/mai --name 舞 \\
         --map idle=0 attack=1,2 hurt=3 win=3,4,0 --lift 4=60 --windup 1 --height 72
 
+    # several sheets (a walk cycle, a sheet of attacks…): poses are <sheet>.<pose>, scaled to match
+    python3 tools/sheet_to_pxo.py walk.png moves.png --out characters/mai --ref 0.0 1.0 \\
+        --map walk=0.0,0.1,0.2,0.3 attack=1.5,1.6,1.7 --loop 1,2,3 --windup 1
+
 The background is the colour found along the picture's border; everything that differs from it is kept.
 Parts of a pose that are not touching (an open fan, a swirl of petals) are joined to the nearest pose.
 Every pose is placed on one shared canvas with its feet on the same spot (the bottom of the pose, centred
@@ -120,70 +124,90 @@ def write_pxo(path, frames, tags, fps=10):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument('sheet')
+    ap.add_argument('sheets', nargs='+', help='one or more pose sheets; poses are named <sheet>.<pose> (or just <pose> with one sheet)')
     ap.add_argument('--out', required=True, help='character folder, e.g. characters/mai')
     ap.add_argument('--name', default='')
-    ap.add_argument('--map', nargs='*', default=[], help='action=pose,pose… (idle walk attack hurt win)')
-    ap.add_argument('--lift', nargs='*', default=[], help='pose=px  raise a pose (a jump)')
-    ap.add_argument('--scale', type=float, default=0)
+    ap.add_argument('--map', nargs='*', default=[], help='action=pose,pose… (idle walk attack attack2 hurt win)')
+    ap.add_argument('--lift', nargs='*', default=[], help='pose=px  raise a pose (a jump), in output px')
+    ap.add_argument('--ref', nargs='*', default=[], help='a standing pose per sheet (e.g. 0.0 1.0 2.0); sheets are scaled so these match --stand')
+    ap.add_argument('--stand', type=int, default=300, help='standing height in the output (px)')
+    ap.add_argument('--bob', nargs='*', default=[], help='action  add a 2 px breathing copy of each of its poses (for a single still idle)')
+    ap.add_argument('--loop', default='', help='walk loop, e.g. 1,2,3,4,5,6,7')
     ap.add_argument('--windup', type=int, default=0)
     ap.add_argument('--height', type=float, default=72, help='height in the game (world px, 36–80)')
     ap.add_argument('--faces', default='right')
-    ap.add_argument('--dt', type=float, default=0.18, help='seconds per pose')
+    ap.add_argument('--dt', nargs='*', default=[], help='action=seconds per pose (default 0.12, walk 0.1)')
     ap.add_argument('--join', type=int, default=5, help='px: parts of a pose closer than this are joined')
     ap.add_argument('--tol', type=int, default=34, help='how far from the background colour counts as the picture')
     args = ap.parse_args()
     out = pathlib.Path(args.out); out.mkdir(parents=True, exist_ok=True)
-    poses = find_poses(Image.open(args.sheet), tol=args.tol, join=args.join)
-    contact_sheet(poses, out / 'poses.png')
-    print(f'{len(poses)} poses → {out / "poses.png"}')
-    for i, p in enumerate(poses):
-        print(f'  {i}: box {p["box"]}  feet {tuple(round(v) for v in p["feet"])}')
+    poses = {}
+    for si, sheet in enumerate(args.sheets):
+        found = find_poses(Image.open(sheet), tol=args.tol, join=args.join)
+        contact_sheet(found, out / (f'poses_{si}.png' if len(args.sheets) > 1 else 'poses.png'))
+        print(f'{sheet}: {len(found)} poses')
+        for i, p in enumerate(found):
+            key = f'{si}.{i}' if len(args.sheets) > 1 else str(i)
+            poses[key] = dict(p, sheet=si)
+            print(f'  {key}: box {p["box"]}  height {p["box"][3] - p["box"][1] + 1}')
     if not args.map:
         return
-    acts = {}
-    for m in args.map:
-        k, v = m.split('=')
-        acts[k] = [int(i) for i in v.split(',')]
-    lift = {int(k): int(v) for k, v in (m.split('=') for m in args.lift)}
+    acts = {k: v.split(',') for k, v in (m.split('=') for m in args.map)}
+    lift = {k: int(v) for k, v in (m.split('=') for m in args.lift)}
+    dts = {k: float(v) for k, v in (m.split('=') for m in args.dt)}
     used = sorted({i for v in acts.values() for i in v})
-    stand = max(poses[i]['img'].shape[0] for i in acts.get('idle', used[:1]))
-    scale = args.scale or min(1.0, 300 / stand)
+    # one scale per sheet: its standing reference pose becomes --stand px tall
+    refs = {poses[r]['sheet']: poses[r] for r in args.ref}
+    scale = {}
+    for i in used:
+        si = poses[i]['sheet']
+        ref = refs.get(si) or poses[acts.get('idle', used)[0]]
+        scale[si] = args.stand / (ref['box'][3] - ref['box'][1] + 1)
     sized = {}
     for i in used:
+        k = scale[poses[i]['sheet']]
         im = Image.fromarray(poses[i]['img'])
-        im = im.resize((max(1, round(im.width * scale)), max(1, round(im.height * scale))), Image.LANCZOS)
+        im = im.resize((max(1, round(im.width * k)), max(1, round(im.height * k))), Image.LANCZOS)
         fx, fy = poses[i]['feet']
-        sized[i] = (np.asarray(im), fx * scale, fy * scale + lift.get(i, 0) * scale)
+        sized[i] = (np.asarray(im), fx * k, fy * k + lift.get(i, 0))
     left = max(fx for _, fx, _ in sized.values()); right = max(im.shape[1] - fx for im, fx, _ in sized.values())
-    up = max(fy for _, _, fy in sized.values())
+    up = max(fy for _, _, fy in sized.values()) + 2
     W, H = int(np.ceil(left + right)) + 4, int(np.ceil(up)) + 2
     ax, ay = int(np.ceil(left)) + 2, H
-    canvases = {}
-    for i, (im, fx, fy) in sized.items():
+
+    def canvas(i, dy=0):
+        im, fx, fy = sized[i]
         cv = Image.new('RGBA', (W, H))
-        cv.alpha_composite(Image.fromarray(im), (int(round(ax - fx)), int(round(ay - fy))))
-        canvases[i] = np.asarray(cv).copy()
+        cv.alpha_composite(Image.fromarray(im), (int(round(ax - fx)), int(round(ay - fy + dy))))
+        return np.asarray(cv).copy()
+
     frames, tags = [], []
-    colors = {'idle': 'c9a64aff', 'walk': '8fc9b8ff', 'attack': '5b86c9ff', 'hurt': 'd0533aff', 'win': 'e58fa6ff'}
-    fps = 10
-    for k in ('idle', 'walk', 'attack', 'hurt', 'win'):
+    colors = {'idle': 'c9a64aff', 'walk': '8fc9b8ff', 'attack': '5b86c9ff', 'attack2': '7b68c9ff', 'hurt': 'd0533aff', 'win': 'e58fa6ff'}
+    fps = 20
+    for k in ('idle', 'walk', 'attack', 'attack2', 'hurt', 'win'):
         if k not in acts:
             continue
-        tags.append({'name': k, 'color': colors[k], 'from': len(frames) + 1, 'to': len(frames) + len(acts[k])})
-        for j, i in enumerate(acts[k]):
-            hold = 30 if k == 'win' and j == len(acts[k]) - 1 else 1
-            frames.append((canvases[i], round(args.dt * fps * hold, 2)))
+        seq = [(i, 0) for i in acts[k]]
+        if k in args.bob:
+            seq = [x for i in acts[k] for x in ((i, 0), (i, 2))]
+        tags.append({'name': k, 'color': colors[k], 'from': len(frames) + 1, 'to': len(frames) + len(seq)})
+        dt = dts.get(k, 0.1 if k == 'walk' else 0.5 if k == 'idle' else 0.12)
+        for j, (i, dy) in enumerate(seq):
+            hold = 12 if k == 'win' and j == len(seq) - 1 else 1
+            frames.append((canvas(i, dy), round(dt * fps * hold, 2)))
     cid = out.name
     write_pxo(out / f'{cid}.pxo', frames, tags, fps)
-    Image.fromarray(canvases[acts.get('idle', used)[0]]).save(out / 'sprite.png')
+    Image.fromarray(canvas(acts.get('idle', used)[0])).save(out / 'sprite.png')
     meta = {'name': args.name or cid, 'desc': '', 'order': 50, 'sprite': 'sprite.png', 'pxo': f'{cid}.pxo',
-            'feet': [ax, ay], 'body': round(max(poses[i]['img'].shape[0] for i in acts.get('idle', used[:1])) * scale),
-            'height': args.height, 'faces': args.faces, 'pixelated': False}
+            'feet': [ax, ay], 'body': args.stand, 'height': args.height, 'faces': args.faces, 'pixelated': False}
     if 'walk' not in acts:
         meta['walk'] = {'tag': 'idle'}       # a single standing pose walks by the game's own motion
+    elif args.loop:
+        meta['walk'] = {'tag': 'walk', 'loop': [int(v) for v in args.loop.split(',')]}
     if args.windup:
         meta['attack'] = {'tag': 'attack', 'windup': args.windup}
+        if 'attack2' in acts:
+            meta['attack2'] = {'tag': 'attack2', 'windup': args.windup}
     (out / 'character.json').write_text(json.dumps(meta, ensure_ascii=False, indent=2), encoding='utf-8')
     print(f'wrote {out / (cid + ".pxo")} ({W}×{H}, {len(frames)} frames) and character.json')
 

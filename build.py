@@ -86,7 +86,7 @@ def stage_defs() -> list:
 # A .pxo (Pixelorama 1.0+) is a ZIP: data.json describes the canvas, layers, frames and tags, and every cel's
 # pixels are a raw RGBA8 buffer at image_data/frames/<frame>/layer_<layer> (both counted from 1). Since
 # Pixelorama 1.2.4 a cel may be smaller than the canvas ("image_size") and placed at "offset".
-ANIMS = ("idle", "walk", "attack", "hurt", "win")
+ANIMS = ("idle", "walk", "attack", "attack2", "hurt", "win")
 
 
 def _vec(text, default):
@@ -129,6 +129,9 @@ def read_pxo(path: pathlib.Path) -> dict:
             if len(data) != iw * ih * 4:
                 raise SystemExit(f"{path.relative_to(ROOT)}: frame {fi + 1} layer {li + 1} has an unexpected size")
             op = float(cel.get("opacity", 1.0)) * float(layers[li].get("opacity", 1.0))
+            if (iw, ih, ox, oy) == (w, h, 0, 0) and op >= 1 and not any(canvas):
+                canvas[:] = data  # the usual case: one full-size layer
+                continue
             for y in range(ih):
                 cy = y + oy
                 if not 0 <= cy < h:
