@@ -1150,12 +1150,30 @@ function cutout(img) {
   return { canvas: out, ax: sa ? sx / sa + 0.5 : out.width / 2, ay: out.height };
 }
 
+// actions a character can have drawn (a sheet each; only walk is required): standing still, walking, the fan
+// swing, being hit, and the win after 大墨 falls. `durs` (seconds per frame) comes from a Pixelorama project.
+const ANIMS = ['idle', 'walk', 'attack', 'hurt', 'win'];
+const ANIM_DT = { idle: 0.25, walk: 0.15, hurt: 0.15, win: 0.2 };
+function animDurs(spec, n, name) {
+  if (spec && Array.isArray(spec.durs) && spec.durs.length === n && spec.durs.every((v) => v > 0)) return spec.durs.map(Number);
+  if (name === 'attack') return n === 2 ? [ATK_F0, ATK_F1] : Array(n).fill((ATK_F0 + ATK_F1) / n);
+  return Array(n).fill((spec && Number(spec.dt)) || ANIM_DT[name] || 0.15);
+}
+// which frame of a timed sequence is showing `t` seconds in (looping, or holding the last frame)
+function frameAt(durs, t, loop) {
+  const total = durs.reduce((a, v) => a + v, 0);
+  if (loop) t %= total; else if (t >= total) return durs.length - 1;
+  for (let i = 0; i < durs.length; i++) { t -= durs[i]; if (t < 0) return i; }
+  return durs.length - 1;
+}
 function makeCharacter(def, imgs) {
   const CH = { id: def.id, name: def.name || def.id, desc: def.desc || '', alt: def.alt || def.name || def.id, faces: def.faces === 'right' ? 'right' : 'left' };
   let walk, attack = null, ax, ay;
+  const extra = {};
   if (def.walk && imgs.walk) {
     walk = sliceSheet(imgs.walk, Math.max(1, def.walk.frames | 0));
     if (def.attack && imgs.attack) attack = sliceSheet(imgs.attack, Math.max(1, def.attack.frames | 0));
+    for (const k of ['idle', 'hurt', 'win']) if (def[k] && imgs[k]) extra[k] = sliceSheet(imgs[k], Math.max(1, def[k].frames | 0));
     [ax, ay] = Array.isArray(def.feet) ? def.feet.map(Number) : [walk[0].width / 2, walk[0].height];
   } else {
     const cut = cutout(imgs.sprite);
@@ -1165,9 +1183,13 @@ function makeCharacter(def, imgs) {
   CH.pixel = def.pixelated != null ? !!def.pixelated : ay <= CHAR_H * 1.7;
   // world px per source px: pixel art keeps whole-number steps so every source pixel stays square
   CH.s = CH.pixel && ay <= H * 1.5 ? Math.max(1, Math.round(H / ay)) : H / ay;
-  CH.H = ay * CH.s;
+  CH.H = (Number(def.body) > 0 ? Number(def.body) : ay) * CH.s; // body: figure height when the canvas has room above her
   CH.walk = walk; CH.attack = attack; CH.ax = ax; CH.ay = ay;
-  CH.walkW = walk.map(whiteOf); CH.attackW = attack && attack.map(whiteOf);
+  CH.anims = {};
+  for (const k of ANIMS) {
+    const fr = k === 'walk' ? walk : k === 'attack' ? attack : extra[k];
+    if (fr) CH.anims[k] = { frames: fr, white: fr.map(whiteOf), durs: animDurs(def[k], fr.length, k) };
+  }
   const loop = def.walk && Array.isArray(def.walk.loop) ? def.walk.loop.filter((i) => i >= 0 && i < walk.length) : [];
   CH.loop = loop.length ? loop : walk.length > 2 ? walk.map((_, i) => i).slice(1) : walk.map((_, i) => i); // frame 0 = standing
   CH.dt = (def.walk && Number(def.walk.dt)) || 0.15;
@@ -1178,9 +1200,10 @@ function makeCharacter(def, imgs) {
 }
 function loadCharacter(def) {
   const opt = (u) => (u ? loadImg(u).catch(() => null) : Promise.resolve(null));
-  return Promise.all([opt(def.sprite), opt(def.walk && def.walk.src), opt(def.attack && def.attack.src)]).then(([sprite, walk, attack]) => {
-    if (!sprite && !walk) throw new Error('character image');
-    return makeCharacter(def, { sprite: sprite || walk, walk, attack });
+  return Promise.all([opt(def.sprite), ...ANIMS.map((k) => opt(def[k] && def[k].src))]).then(([sprite, ...sheets]) => {
+    const imgs = Object.fromEntries(ANIMS.map((k, i) => [k, sheets[i]]));
+    if (!sprite && !imgs.walk) throw new Error('character image');
+    return makeCharacter(def, { sprite: sprite || imgs.walk, ...imgs });
   });
 }
 // high-resolution heroines: frames pre-shrunk to the on-screen size, rebuilt when the zoom changes
@@ -1188,8 +1211,9 @@ function heroScaled(CH, k) {
   if (CH.cache && CH.cache.k === k) return CH.cache;
   const sc = CH.s * k;
   const fit = (list) => list && list.map((f) => shrink(f, 0, 0, f.width, f.height, Math.max(1, Math.round(f.width * sc)), Math.max(1, Math.round(f.height * sc))));
-  const walk = fit(CH.walk), attack = fit(CH.attack);
-  CH.cache = { k, sc, walk, attack, walkW: walk.map(whiteOf), attackW: attack && attack.map(whiteOf) };
+  const anims = {};
+  for (const name in CH.anims) { const fr = fit(CH.anims[name].frames); anims[name] = { frames: fr, white: fr.map(whiteOf) }; }
+  CH.cache = { k, sc, anims };
   return CH.cache;
 }
 // body anchors above the feet, scaled from the original 54px heroine
@@ -2376,12 +2400,13 @@ function bossDefeated(b) {
   }
   if (!reduced) R.rings.push({ x: b.x, y: b.y, r: maxD, t: 0, dur: 1.5, big: true });
   R.blades.length = 0;
-  R.p.inv = 99; R.clearT = reduced ? 0.8 : 2.1;
+  R.p.inv = 99; R.clearT = reduced ? 0.8 : 2.1; R.clearAt = R.time;
   sfx('clear');
   G.state = 'clearing';
 }
 function hitPlayer(src) {
   const R = run, P = R.p;
+  if (!R.shield) R.hurtAt = R.time; // the knock-back pose
   if (G.god) { P.inv = 1; return; }
   if (R.shield) { // 白: the paper shield takes the hit
     R.shield = false; P.inv = 0.6; sfx('click');
@@ -2904,16 +2929,21 @@ function drawPlayer(g) {
     g.globalAlpha = 1;
   }
   if (P.inv > 0 && P.inv < 0.88 && G.state === 'play' && Math.floor(P.inv * 14) % 2 === 0) return; // blink
-  const since = R.time - P.fireAt, swing = since >= 0 && since < ATK_F0 + ATK_F1;
+  const A = CH.anims, atkLen = A.attack ? A.attack.durs.reduce((a, v) => a + v, 0) : ATK_F0 + ATK_F1;
+  const since = R.time - P.fireAt, swing = since >= 0 && since < atkLen;
   const white = P.inv > 0.88 && G.state === 'play';
   const flip = CH.faces === 'left' ? P.facing > 0 : P.facing < 0;
   const attacking = swing && !!CH.attack;
-  let f = 0, bob = 0, rot = 0, sx = 1, sy = 1;
+  let f = 0, bob = 0, rot = 0, sx = 1, sy = 1, anim = 'walk';
   if (!CH.procedural) {
-    const n = attacking ? CH.attack.length : 0;
-    if (attacking) f = n === 2 ? (since < ATK_F0 ? 0 : 1) : Math.min(n - 1, Math.floor((since / (ATK_F0 + ATK_F1)) * n));
+    // the win once 大墨 falls, a knock-back just after a hit, the fan swing, walking, then standing
+    const hurtFor = A.hurt ? A.hurt.durs.reduce((a, v) => a + v, 0) : 0;
+    if (G.state === 'clearing' && A.win) { anim = 'win'; f = frameAt(A.win.durs, R.time - (R.clearAt ?? R.time), false); }
+    else if (A.hurt && R.hurtAt != null && R.time - R.hurtAt < hurtFor) { anim = 'hurt'; f = frameAt(A.hurt.durs, R.time - R.hurtAt, false); }
+    else if (attacking) { anim = 'attack'; f = frameAt(A.attack.durs, since, false); }
     else if (P.moving) f = CH.loop[Math.floor(R.time / CH.dt) % CH.loop.length];
-    bob = P.moving ? 0 : Math.floor(R.time / 0.4) % 2;
+    else if (A.idle) { anim = 'idle'; f = frameAt(A.idle.durs, R.time, true); }
+    else bob = Math.floor(R.time / 0.4) % 2;
   } else {
     const t = R.time;
     if (P.moving) { const ph = (t / 0.3) * Math.PI; bob = Math.abs(Math.sin(ph)) * CH.H * 0.04; rot = Math.sin(ph) * 0.05; sy = 1 - 0.025 * Math.abs(Math.cos(ph)); }
@@ -2922,9 +2952,9 @@ function drawPlayer(g) {
     sx = 1 + (1 - sy) * 0.6;
     if (CH.pixel) { bob = Math.round(bob); rot = 0; sx = sy = 1; } // pixel stills only hop
   }
-  heroFrame = (attacking ? 'a' : 'w') + f;
+  heroFrame = ({ idle: 'i', walk: 'w', attack: 'a', hurt: 'h', win: 'v' })[anim] + f;
   if (CH.pixel) {
-    const list = attacking ? (white ? CH.attackW : CH.attack) : (white ? CH.walkW : CH.walk), img = list[f], s = CH.s;
+    const img = (white ? A[anim].white : A[anim].frames)[f], s = CH.s;
     g.save(); g.translate(Math.round(P.x), Math.round(P.y) + 1 - bob);
     if (flip) g.scale(-1, 1);
     g.drawImage(img, -CH.ax * s, -CH.ay * s, img.width * s, img.height * s);
@@ -2933,7 +2963,7 @@ function drawPlayer(g) {
   }
   // high resolution: draw the pre-shrunk frame 1:1 in device pixels
   const k = view.k, C2 = heroScaled(CH, k);
-  const img = (attacking ? (white ? C2.attackW : C2.attack) : (white ? C2.walkW : C2.walk))[f];
+  const img = (white ? C2.anims[anim].white : C2.anims[anim].frames)[f];
   g.save();
   g.setTransform(1, 0, 0, 1, P.x * k + view.ox, (P.y + 1 - bob) * k + view.oy);
   if (rot) g.rotate(rot);

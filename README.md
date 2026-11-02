@@ -194,7 +194,29 @@ python3 tools/make_mask.py stages/竹林.png    # → stages/竹林_mask.png（�
 - 高解像度の絵はそのままの細かさで描きます（ズームに合わせて縮小しておき、画面の画素と1対1で描画）。ドット絵は四角い画素のまま拡大します
 - 見た目の高さは 54（ゲーム内の単位）にそろえ、当たり判定も高さに合わせて決まります
 
-歩き・攻撃のコマ絵がある場合は `characters/名前/character.json` で指定します（`characters/aoi/character.json` が見本です）。
+### 動きを Pixelorama で描く
+
+藍の動きは Pixelorama のプロジェクト `characters/aoi/aoi.pxo` が元になっています。**Pixelorama で開いて描き直し、保存して `python3 build.py` を実行すると、そのままゲームに入ります**（PNG への書き出しは要りません）。
+
+![藍の動き（待機・歩き・扇・被弾・勝ち）](characters/aoi/preview_actions.gif)
+
+| タグ | コマ | ゲームで使う場面 |
+|---|---|---|
+| `idle` | 4 | 立ち止まっているあいだ（くり返し） |
+| `walk` | 4 | 歩いているあいだ。0番が立ち姿で、`loop` の順にくり返す |
+| `attack` | 4 | 扇を振るたび（溜め → 振り → 振り切り → 戻り） |
+| `hurt` | 2 | 墨に当たった直後（のけぞり） |
+| `win` | 4 | 大墨を祓ったあと（しゃがむ → 跳ねて扇を掲げる → きらめき → 着地） |
+
+- 動きの区切りは Pixelorama の**アニメーションタグ**で決まります。タグ名を上の名前のままにしておけば、コマを増やしても減らしてもかまいません。`walk` 以外のタグはなくても動きます
+- コマの長さは、Pixelorama のフレームの長さ（フレームのプロパティ）とFPSから決まります
+- キャンバスは 32×58 です。足元は下辺の中央（`feet: [18, 58]`）にそろえてください。上の4マスと左右2マスは、跳ねる・扇を掲げる・きらめきのための余白です
+- レイヤーは何枚でもかまいません。表示しているピクセルレイヤーを重ねたものが使われます（Pixelorama 1.0 以降の .pxo を読めます）
+- 最初の下書きは `python3 tools/make_aoi_pxo.py` で元の立ち絵から作っています（実行すると aoi.pxo を作り直すので、手で直したあとは実行しないでください）
+
+### character.json
+
+コマ絵や Pixelorama のプロジェクトがある場合は `characters/名前/character.json` で指定します（`characters/aoi/character.json` が見本です）。
 
 | 項目 | 意味 |
 |---|---|
@@ -202,9 +224,10 @@ python3 tools/make_mask.py stages/竹林.png    # → stages/竹林_mask.png（�
 | `order` | 並び順（小さいほど前） |
 | `sprite` | 立ち絵（1枚絵として使う画像） |
 | `portrait` | タイトルに大きく出す絵（省略すると立ち絵） |
-| `walk` | `{ "file": "walk.png", "frames": 4, "loop": [1,2,3,2], "dt": 0.15 }` 横に並べたコマ。0番が立ち姿 |
-| `attack` | `{ "file": "attack.png", "frames": 2 }` 扇を振るコマ |
+| `pxo` | Pixelorama のプロジェクト（例 `"aoi.pxo"`）。タグ `idle` `walk` `attack` `hurt` `win` がそれぞれの動きになる |
+| `walk` など | `pxo` を使うとき：`{ "tag": "walk", "loop": [1,2,3,2] }`（タグ名が違うときだけ `tag`）。PNG のコマ絵を使うとき：`{ "file": "walk.png", "frames": 4, "loop": [1,2,3,2], "dt": 0.15 }` 横に並べたコマ。0番が立ち姿。`attack` も同じ形 |
 | `feet` | コマの中の足元の位置 `[x, y]`（画素） |
+| `body` | キャンバスの上に余白があるときの、体の高さ（画素）。当たり判定はこの高さで決まる |
 | `height` | 見た目の高さ（36〜80、標準 54） |
 | `pixelated` | `true` でドット絵扱い（省略すると大きさから自動判定） |
 | `faces` | 元の絵が向いている向き `"left"` / `"right"` |
@@ -216,9 +239,9 @@ index.html            ビルド済みのゲーム（これだけで動く）
 game.src.html         ゲームのソース（画像はプレースホルダー）
 build.py              stages/・characters/ の画像と効果音を埋め込んで index.html を作る
 parts/sfx.js          効果音（WebAudio で合成。音声ファイルなし）
-characters/           キャラクター（aoi/ に藍の立ち絵・歩き/攻撃コマ・character.json）
+characters/           キャラクター（aoi/ に藍の立ち絵・動きの Pixelorama プロジェクト aoi.pxo・character.json）
 stages/               ステージ画像と stages.json、ギミック指定の画像（*_mask.png）、生成スクリプト・地形チェック
-tools/                キャラ切り抜き・歩きコマ生成・マスクのたたき台作りのスクリプト
+tools/                キャラ切り抜き・動きの下書き（aoi.pxo）作り・マスクのたたき台作りのスクリプト
 docs/                 設計メモ（流派「残響」の宣言、次の型「摺り」のプロット）
 ```
 
@@ -236,8 +259,9 @@ python3 build.py
 # 一覧画像からキャラを切り抜いてスプライト化
 python3 tools/cut_character.py 一覧画像.jpg --box 118 20 196 130
 
-# 歩き4コマ・攻撃2コマを生成
-python3 tools/make_walk_frames.py
+# 藍の動きの下書き（待機・歩き・扇・被弾・勝ち）を Pixelorama のプロジェクトとして作る
+# （aoi.pxo を上書きするので、Pixelorama で手を入れたあとは実行しない）
+python3 tools/make_aoi_pxo.py
 
 # 追加ステージ画像を生成し、地形の比率をチェック
 python3 stages/gen_shu_street.py

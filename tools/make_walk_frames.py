@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
-"""Generate characters/aoi/walk.png / attack.png + previews from characters/aoi/sprite.png.
+"""Pixel transforms for 藍 (shared by make_aoi_pxo.py, which now builds characters/aoi/aoi.pxo from them).
+
+Run directly it still writes the old walk.png / attack.png sheets, which the game no longer uses.
 
 All edits are done on the "body" layer (outline stripped); the 1px light outline
 is regenerated for every frame (transparent px 4-adjacent to body -> outline).

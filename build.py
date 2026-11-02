@@ -9,10 +9,16 @@ Stages      every image in stages/ (except preview_* and *_mask) becomes a stage
 Characters  every folder in characters/ (and every lone image directly in characters/) becomes a
             playable character. characters/<id>/character.json is optional — without it the folder's
             sprite.* (or its first image) is used as a still, and the game animates it by itself.
+            With "pxo" in character.json the actions come straight from a Pixelorama project: each
+            animation tag (idle / walk / attack / hurt / win) becomes that action, with its frame timing.
 """
 import base64
 import json
 import pathlib
+import re
+import struct
+import zipfile
+import zlib
 
 ROOT = pathlib.Path(__file__).resolve().parent
 SRC = ROOT / "game.src.html"
@@ -76,6 +82,92 @@ def stage_defs() -> list:
     return out
 
 
+# ── Pixelorama (.pxo) ──
+# A .pxo (Pixelorama 1.0+) is a ZIP: data.json describes the canvas, layers, frames and tags, and every cel's
+# pixels are a raw RGBA8 buffer at image_data/frames/<frame>/layer_<layer> (both counted from 1). Since
+# Pixelorama 1.2.4 a cel may be smaller than the canvas ("image_size") and placed at "offset".
+ANIMS = ("idle", "walk", "attack", "hurt", "win")
+
+
+def _vec(text, default):
+    if isinstance(text, (list, tuple)) and len(text) == 2:
+        return int(text[0]), int(text[1])
+    m = re.search(r"(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)", str(text or ""))
+    return (int(float(m.group(1))), int(float(m.group(2)))) if m else default
+
+
+def read_pxo(path: pathlib.Path) -> dict:
+    try:
+        z = zipfile.ZipFile(path)
+        d = json.loads(z.read("data.json").decode("utf-8"))
+    except (zipfile.BadZipFile, KeyError, json.JSONDecodeError) as e:
+        raise SystemExit(f"{path.relative_to(ROOT)}: not a Pixelorama 1.0+ project ({e})")
+    w, h = int(d["size_x"]), int(d["size_y"])
+    if int(d.get("color_mode", 5)) not in (5, -1, 40, 48):  # RGBA8, or indexed (stored as RGBA8)
+        raise SystemExit(f"{path.relative_to(ROOT)}: only RGBA / indexed colour projects are supported")
+    layers, names = d.get("layers", []), set(z.namelist())
+
+    def shown(i):  # a layer and all of its parent groups visible
+        while i >= 0:
+            if not layers[i].get("visible", True):
+                return False
+            i = int(layers[i].get("parent", -1))
+        return True
+
+    frames, durations = [], []
+    for fi, fr in enumerate(d.get("frames", [])):
+        canvas = bytearray(w * h * 4)
+        for li, cel in enumerate(fr.get("cels", [])):
+            if li >= len(layers) or int(layers[li].get("type", 0)) != 0 or not shown(li):
+                continue
+            name = f"image_data/frames/{fi + 1}/layer_{li + 1}"
+            if name not in names:
+                continue
+            iw, ih = _vec(cel.get("image_size"), (w, h))
+            ox, oy = _vec(cel.get("offset"), (0, 0))
+            data = z.read(name)
+            if len(data) != iw * ih * 4:
+                raise SystemExit(f"{path.relative_to(ROOT)}: frame {fi + 1} layer {li + 1} has an unexpected size")
+            op = float(cel.get("opacity", 1.0)) * float(layers[li].get("opacity", 1.0))
+            for y in range(ih):
+                cy = y + oy
+                if not 0 <= cy < h:
+                    continue
+                for x in range(iw):
+                    cx = x + ox
+                    s = (y * iw + x) * 4
+                    a = data[s + 3] * op / 255
+                    if a <= 0 or not 0 <= cx < w:
+                        continue
+                    t = (cy * w + cx) * 4
+                    da = canvas[t + 3] / 255
+                    oa = a + da * (1 - a)
+                    for c in range(3):  # straight-alpha "over"
+                        canvas[t + c] = round((data[s + c] * a + canvas[t + c] * da * (1 - a)) / oa)
+                    canvas[t + 3] = round(oa * 255)
+        frames.append(bytes(canvas))
+        durations.append(float(fr.get("duration", 1.0)))
+    fps = float(d.get("fps", 6.0)) or 6.0
+    tags = {t["name"]: (int(t["from"]) - 1, int(t["to"]) - 1) for t in d.get("tags", [])}
+    return {"w": w, "h": h, "frames": frames, "secs": [v / fps for v in durations], "tags": tags}
+
+
+def png_uri(w: int, h: int, rgba: bytes) -> str:
+    raw = b"".join(b"\x00" + rgba[y * w * 4:(y + 1) * w * 4] for y in range(h))
+    chunk = lambda t, b: struct.pack(">I", len(b)) + t + b + struct.pack(">I", zlib.crc32(t + b) & 0xFFFFFFFF)
+    png = b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", w, h, 8, 6, 0, 0, 0)) + chunk(b"IDAT", zlib.compress(raw, 9)) + chunk(b"IEND", b"")
+    return "data:image/png;base64," + base64.b64encode(png).decode("ascii")
+
+
+def strip(px: dict, a: int, b: int) -> str:
+    """Frames a..b of a project side by side, as one PNG."""
+    w, h, n = px["w"], px["h"], b - a + 1
+    rows = []
+    for y in range(h):
+        rows.append(b"".join(px["frames"][i][y * w * 4:(y + 1) * w * 4] for i in range(a, b + 1)))
+    return png_uri(w * n, h, b"".join(rows))
+
+
 def pick_sprite(folder: pathlib.Path):
     imgs = [p for p in sorted(folder.iterdir()) if is_image(p)]
     for p in imgs:
@@ -91,8 +183,22 @@ def character_def(cid: str, folder: pathlib.Path, meta: dict, sprite: pathlib.Pa
     portrait = meta.get("portrait") or next((p.name for p in sorted(folder.iterdir()) if is_image(p) and p.stem.lower() == "portrait"), None)
     if portrait:
         d["portrait"] = data_uri(folder / portrait)
+    if meta.get("pxo"):  # actions from a Pixelorama project, one animation tag each
+        px = read_pxo(folder / meta["pxo"])
+        for key in ANIMS:
+            spec = meta.get(key) if isinstance(meta.get(key), dict) else {}
+            tag = spec.get("tag", key)
+            if tag not in px["tags"]:
+                if key == "walk":
+                    raise SystemExit(f"characters/{cid}/{meta['pxo']}: no animation tag named {tag!r}")
+                continue
+            a, b = px["tags"][tag]
+            d[key] = {"src": strip(px, a, b), "frames": b - a + 1, "durs": [round(v, 3) for v in px["secs"][a:b + 1]]}
+            for opt in ("loop", "dt"):
+                if opt in spec:
+                    d[key][opt] = spec[opt]
     for key in ("walk", "attack"):
-        if key in meta:
+        if key in meta and not meta.get("pxo"):
             sheet = meta[key]
             frames = int(sheet.get("frames", 1))
             if frames < 1:
@@ -101,7 +207,7 @@ def character_def(cid: str, folder: pathlib.Path, meta: dict, sprite: pathlib.Pa
             for opt in ("loop", "dt"):
                 if opt in sheet:
                     d[key][opt] = sheet[opt]
-    for opt in ("feet", "height", "pixelated", "faces"):
+    for opt in ("feet", "height", "body", "pixelated", "faces"):
         if opt in meta:
             d[opt] = meta[opt]
     return d

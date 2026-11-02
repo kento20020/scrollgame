@@ -5,9 +5,10 @@
   "order": 0,
   "sprite": "sprite.png",
   "portrait": "portrait.png",
-  "walk": { "file": "walk.png", "frames": 4, "loop": [1, 2, 3, 2], "dt": 0.15 },
-  "attack": { "file": "attack.png", "frames": 2 },
-  "feet": [16, 54],
+  "pxo": "aoi.pxo",
+  "walk": { "tag": "walk", "loop": [1, 2, 3, 2] },
+  "feet": [18, 58],
+  "body": 54,
   "faces": "left",
   "pixelated": true
 }
