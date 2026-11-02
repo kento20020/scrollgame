@@ -86,7 +86,8 @@ def stage_defs() -> list:
 # A .pxo (Pixelorama 1.0+) is a ZIP: data.json describes the canvas, layers, frames and tags, and every cel's
 # pixels are a raw RGBA8 buffer at image_data/frames/<frame>/layer_<layer> (both counted from 1). Since
 # Pixelorama 1.2.4 a cel may be smaller than the canvas ("image_size") and placed at "offset".
-ANIMS = ("idle", "walk", "attack", "attack2", "hurt", "win")
+ANIMS = ("idle", "idle2", "walk", "walk_up", "walk_down", "attack", "attack2", "kick", "kick2",
+         "hurt", "hurt_s", "down", "getup", "ko", "win")
 
 
 def _vec(text, default):

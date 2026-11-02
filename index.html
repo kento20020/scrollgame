@@ -1661,14 +1661,19 @@ function cutout(img) {
   return { canvas: out, ax: sa ? sx / sa + 0.5 : out.width / 2, ay: out.height };
 }
 
-// actions a character can have drawn (a sheet each; only walk is required): standing still, walking, the fan
-// swing (and a second swing, used on every other gust), being hit, and the win after 大墨 falls.
-// `durs` (seconds per frame) comes from a Pixelorama project.
-const ANIMS = ['idle', 'walk', 'attack', 'attack2', 'hurt', 'win'];
-const ANIM_DT = { idle: 0.25, walk: 0.15, hurt: 0.15, win: 0.2 };
+// actions a character can have drawn (a sheet each; only walk is required). `durs` (seconds per frame) comes
+// from a Pixelorama project; attacks may open with `windup` frames shown just before the gust leaves.
+//   idle / idle2      standing (idle2: facing the viewer, after a while or after walking up/down)
+//   walk / walk_up / walk_down   walking sideways, away from the viewer (up), towards the viewer (down)
+//   attack            the fan gust;  attack2: the gust aimed upward;  kick / kick2: ink right beside her
+//   hurt / hurt_s     hit / hit taken by the paper shield;  down + getup: knocked down by big ink or 大墨
+//   ko                falling when she has no heart left;   win: after 大墨 falls
+const ANIMS = ['idle', 'idle2', 'walk', 'walk_up', 'walk_down', 'attack', 'attack2', 'kick', 'kick2', 'hurt', 'hurt_s', 'down', 'getup', 'ko', 'win'];
+const ATTACKS = ['attack', 'attack2', 'kick', 'kick2'];
+const ANIM_DT = { idle: 0.25, idle2: 0.25, walk: 0.15, walk_up: 0.15, walk_down: 0.15, hurt: 0.15, hurt_s: 0.1, down: 0.15, getup: 0.12, ko: 0.25, win: 0.2 };
 function animDurs(spec, n, name) {
   if (spec && Array.isArray(spec.durs) && spec.durs.length === n && spec.durs.every((v) => v > 0)) return spec.durs.map(Number);
-  if (name === 'attack' || name === 'attack2') return n === 2 ? [ATK_F0, ATK_F1] : Array(n).fill((ATK_F0 + ATK_F1) / n);
+  if (ATTACKS.includes(name)) return n === 2 ? [ATK_F0, ATK_F1] : Array(n).fill((ATK_F0 + ATK_F1) / n);
   return Array(n).fill((spec && Number(spec.dt)) || ANIM_DT[name] || 0.15);
 }
 // which frame of a timed sequence is showing `t` seconds in (looping, or holding the last frame)
@@ -1685,7 +1690,7 @@ function makeCharacter(def, imgs) {
   if (def.walk && imgs.walk) {
     walk = sliceSheet(imgs.walk, Math.max(1, def.walk.frames | 0));
     if (def.attack && imgs.attack) attack = sliceSheet(imgs.attack, Math.max(1, def.attack.frames | 0));
-    for (const k of ['idle', 'attack2', 'hurt', 'win']) if (def[k] && imgs[k]) extra[k] = sliceSheet(imgs[k], Math.max(1, def[k].frames | 0));
+    for (const k of ANIMS) if (k !== 'walk' && k !== 'attack' && def[k] && imgs[k]) extra[k] = sliceSheet(imgs[k], Math.max(1, def[k].frames | 0));
     [ax, ay] = Array.isArray(def.feet) ? def.feet.map(Number) : [walk[0].width / 2, walk[0].height];
   } else {
     const cut = cutout(imgs.sprite);
@@ -1703,13 +1708,13 @@ function makeCharacter(def, imgs) {
   CH.anims = {};
   for (const k of ANIMS) {
     const fr = k === 'walk' ? walk : k === 'attack' ? attack : extra[k];
-    if (fr) CH.anims[k] = { frames: fr, white: fr.map(whiteOf), durs: animDurs(def[k], fr.length, k) };
+    if (fr) CH.anims[k] = { frames: fr, white: fr.map(whiteOf), durs: animDurs(def[k], fr.length, k), windup: Math.min(fr.length - 1, (def[k] && Number(def[k].windup)) | 0) };
   }
   const loop = def.walk && Array.isArray(def.walk.loop) ? def.walk.loop.filter((i) => i >= 0 && i < walk.length) : [];
   CH.loop = loop.length ? loop : walk.length > 2 ? walk.map((_, i) => i).slice(1) : walk.map((_, i) => i); // frame 0 = standing
   CH.dt = (def.walk && Number(def.walk.dt)) || 0.15;
   CH.procedural = walk.length < 2; // a single still walks by procedural motion (drawn actions still play)
-  CH.windup = (def.attack && Number(def.attack.windup)) | 0;    // attack frames shown just before the gust leaves
+
   CH.portrait = def.portrait || walk[0].toDataURL();
   CH.cache = null;
   return CH;
@@ -2849,6 +2854,16 @@ function spawnBoss() {
   sfx('boss');
 }
 
+// which attack she plays for a gust: a kick when ink is right beside her, the upward sweep when the target is
+// above, else the fan sweep (each falls back to the plain attack when it isn't drawn)
+function pickAttack(R) {
+  const A = R.ch.anims, P = R.p, ox = P.x, oy = P.y - R.geo.fan;
+  let best = null, bd = Infinity;
+  for (const e of R.enemies) { if (e.dead) continue; const d = (e.x - ox) ** 2 + (e.y - oy) ** 2; if (d < bd) { bd = d; best = e; } }
+  if (best && A.kick && bd < (34 + best.r) ** 2) return A.kick2 && (R.kicks || 0) % 2 === 1 ? 'kick2' : 'kick';
+  if (best && A.attack2 && best.y - oy < -Math.abs(best.x - ox) * 0.9) return 'attack2';
+  return 'attack';
+}
 function fire() {
   const R = run, P = R.p, ox = P.x, oy = P.y - R.geo.fan;
   let best = null, bd = Infinity;
@@ -2864,6 +2879,7 @@ function fire() {
   else if (bd > 110 * 110) { const q = nearSpring(140); if (q) best = q; }
   const ang = best ? Math.atan2(best.y - oy, best.x - ox) : (P.facing > 0 ? 0 : Math.PI);
   P.fireAt = R.time; sfx('fan');
+  R.atkAnim = pickAttack(R); if (R.atkAnim.startsWith('kick')) R.kicks = (R.kicks || 0) + 1;
   const n = 3 + R.up.blades, spread = ((36 + (n - 3) * 10) * Math.PI) / 180;
   for (let i = 0; i < n; i++) {
     const a = ang - spread / 2 + (spread * i) / (n - 1);
@@ -2921,8 +2937,11 @@ function bossDefeated(b) {
   G.state = 'clearing';
 }
 function hitPlayer(src) {
-  const R = run, P = R.p;
-  if (!R.shield) R.hurtAt = R.time; // the knock-back pose
+  const R = run, P = R.p, A = R.ch.anims;
+  // the reaction: the paper shield takes it lightly, big ink and 大墨 knock her down, the rest stagger her
+  R.hurtAt = R.time;
+  R.hurtKind = R.shield ? 'hurt_s' : (src && (src.boss || src.type === 'big') && A.down) ? 'down' : 'hurt';
+  if (R.hurtKind === 'down') R.downUntil = R.time + (A.down.durs.reduce((a, v) => a + v, 0) + (A.getup ? A.getup.durs.reduce((a, v) => a + v, 0) : 0)) * 0.85;
   if (G.god) { P.inv = 1; return; }
   if (R.shield) { // 白: the paper shield takes the hit
     R.shield = false; P.inv = 0.6; sfx('click');
@@ -2938,7 +2957,11 @@ function hitPlayer(src) {
   if (!reduced) R.shake = 0.25;
   for (let i = 0; i < 6; i++) { const a = Math.random() * Math.PI * 2; R.parts.push({ x: P.x, y: P.y - R.geo.mid, vx: Math.cos(a) * 60, vy: Math.sin(a) * 60, life: 0.35, max: 0.35, kind: 'hit', s: 2 }); }
   hudCache.hp = -1;
-  if (P.hp <= 0) { sfx('death'); endRun('death'); }
+  if (P.hp <= 0) {
+    sfx('death');
+    if (A.ko) { G.state = 'dying'; R.koAt = R.time; R.koEnd = R.time + A.ko.durs.reduce((a, v) => a + v, 0) + 0.4; R.trail.on && clearTrail(R.trail); }
+    else endRun('death');
+  }
 }
 // distance from a point to the heroine's body capsule
 function capsuleDist(px, py, P) {
@@ -2953,9 +2976,11 @@ function update(dt) {
   if (G.state === 'play') R.t += dt;
 
   // ── heroine ──
-  const [ix, iy] = G.state === 'play' || G.state === 'clearing' ? readInput() : [0, 0];
+  const downed = R.downUntil != null && R.time < R.downUntil; // knocked down: no walking until she is up
+  const [ix, iy] = (G.state === 'play' && !downed) || G.state === 'clearing' ? readInput() : [0, 0];
   P.moving = Math.abs(ix) + Math.abs(iy) > 0.05;
   if (Math.abs(ix) > 0.1) P.facing = ix > 0 ? 1 : -1;
+  if (P.moving) { P.dirX = ix; P.dirY = iy; P.stillT = 0; } else P.stillT = (P.stillT || 0) + dt;
   const c0 = cellIndex(P.x, P.y);
   P.inWater = st.terrain[c0] === T_WATER;
   const spd = BASE_SPEED * R.bonus.zori * (1 + 0.15 * R.up.speed) * (P.inWater ? 0.55 : 1) * (R.trail.on ? BRUSH.speed : 1) * (flooded(R, c0) ? 0.6 : 1);
@@ -2978,6 +3003,11 @@ function update(dt) {
     updateParticles(dt);
     R.clearT -= dt;
     if (R.clearT <= 0) endRun('clear');
+    return;
+  }
+  if (G.state === 'dying') { // the K.O. fall plays out, then the result
+    updateParticles(dt);
+    if (R.time >= R.koEnd) endRun('death');
     return;
   }
 
@@ -3446,11 +3476,10 @@ function drawPlayer(g) {
   }
   if (P.inv > 0 && P.inv < 0.88 && G.state === 'play' && Math.floor(P.inv * 14) % 2 === 0) return; // blink
   const A = CH.anims, sum = (l) => l.reduce((a, v) => a + v, 0);
-  // the attack sheet may open with wind-up frames, shown while the next gust is about to leave; with a second
-  // attack drawn, the gusts alternate between them (the current one by the volley count, the next by +1)
-  const atkOf = (n) => (A.attack2 && n % 2 === 1 ? 'attack2' : 'attack');
-  const curAtk = atkOf(R.volley || 0), nextAtk = atkOf((R.volley || 0) + 1), AT = A[curAtk], AN = A[nextAtk];
-  const wu = AT ? Math.min(CH.windup, AT.frames.length - 1) : 0, wuN = AN ? Math.min(CH.windup, AN.frames.length - 1) : 0;
+  // the attack sheet may open with wind-up frames, shown while the next gust is about to leave
+  const curAtk = A[R.atkAnim] ? R.atkAnim : 'attack', nextAtk = G.state === 'play' && R.fireT < 0.3 ? pickAttack(R) : curAtk;
+  const AT = A[curAtk], AN = A[nextAtk] || AT;
+  const wu = AT ? AT.windup : 0, wuN = AN ? AN.windup : 0;
   const strike = AT ? AT.durs.slice(wu) : null, atkLen = AT ? sum(strike) : ATK_F0 + ATK_F1;
   const since = R.time - P.fireAt, swing = since >= 0 && since < atkLen;
   const winding = wuN > 0 && !swing && G.state === 'play' && R.fireT > 0 && R.fireT < sum(AN.durs.slice(0, wuN));
@@ -3458,14 +3487,22 @@ function drawPlayer(g) {
   const flip = CH.faces === 'left' ? P.facing > 0 : P.facing < 0;
   const attacking = swing && !!CH.attack;
   let f = 0, bob = 0, rot = 0, sx = 1, sy = 1, anim = 'walk';
-  // the win once 大墨 falls, a knock-back just after a hit, the fan swing (and its wind-up), walking, standing
-  const hurtFor = A.hurt ? sum(A.hurt.durs) : 0;
-  if (G.state === 'clearing' && A.win) { anim = 'win'; f = frameAt(A.win.durs, R.time - (R.clearAt ?? R.time), false); }
-  else if (A.hurt && R.hurtAt != null && R.time - R.hurtAt < hurtFor) { anim = 'hurt'; f = frameAt(A.hurt.durs, R.time - R.hurtAt, false); }
+  // the fall, the win once 大墨 falls, a knock-down or a stagger just after a hit, the swing (and its wind-up),
+  // walking (sideways, up or down), standing
+  const hk = R.hurtKind && A[R.hurtKind] ? R.hurtKind : 'hurt', since_hit = R.hurtAt != null ? R.time - R.hurtAt : Infinity;
+  const downFor = A.down ? sum(A.down.durs) : 0, upFor = A.getup ? sum(A.getup.durs) : 0;
+  if (G.state === 'dying' && A.ko) { anim = 'ko'; f = frameAt(A.ko.durs, R.time - R.koAt, false); }
+  else if (G.state === 'clearing' && A.win) { anim = 'win'; f = frameAt(A.win.durs, R.time - (R.clearAt ?? R.time), false); }
+  else if (hk === 'down' && since_hit < downFor) { anim = 'down'; f = frameAt(A.down.durs, since_hit, false); }
+  else if (hk === 'down' && A.getup && since_hit < downFor + upFor) { anim = 'getup'; f = frameAt(A.getup.durs, since_hit - downFor, false); }
+  else if (A[hk] && hk !== 'down' && since_hit < sum(A[hk].durs)) { anim = hk; f = frameAt(A[hk].durs, since_hit, false); }
   else if (attacking) { anim = curAtk; f = wu + frameAt(strike, since, false); }
   else if (winding) { anim = nextAtk; f = frameAt(AN.durs.slice(0, wuN), sum(AN.durs.slice(0, wuN)) - R.fireT, false); }
   if (!CH.procedural) {
-    if (anim === 'walk' && P.moving) f = CH.loop[Math.floor(R.time / CH.dt) % CH.loop.length];
+    const vert = Math.abs(P.dirY || 0) > Math.abs(P.dirX || 0) * 1.15;
+    if (anim === 'walk' && P.moving && vert && (P.dirY < 0 ? A.walk_up : A.walk_down)) { anim = P.dirY < 0 ? 'walk_up' : 'walk_down'; f = frameAt(A[anim].durs, R.time, true); }
+    else if (anim === 'walk' && P.moving) f = CH.loop[Math.floor(R.time / CH.dt) % CH.loop.length];
+    else if (anim === 'walk' && A.idle2 && (P.stillT > 2.5 || vert)) { anim = 'idle2'; f = frameAt(A.idle2.durs, R.time, true); }
     else if (anim === 'walk' && A.idle) { anim = 'idle'; f = frameAt(A.idle.durs, R.time, true); }
     else if (anim === 'walk') bob = Math.floor(R.time / 0.4) % 2;
   } else if (anim === 'walk') {
@@ -3476,7 +3513,7 @@ function drawPlayer(g) {
     sx = 1 + (1 - sy) * 0.6;
     if (CH.pixel) { bob = Math.round(bob); rot = 0; sx = sy = 1; } // pixel stills only hop
   }
-  heroFrame = ({ idle: 'i', walk: 'w', attack: 'a', attack2: 'b', hurt: 'h', win: 'v' })[anim] + f;
+  heroFrame = ({ idle: 'i', idle2: 'j', walk: 'w', walk_up: 'u', walk_down: 'd', attack: 'a', attack2: 'b', kick: 'k', kick2: 'l', hurt: 'h', hurt_s: 's', down: 'n', getup: 'g', ko: 'o', win: 'v' })[anim] + f;
   if (CH.pixel) {
     const img = (white ? A[anim].white : A[anim].frames)[f], s = CH.s;
     g.save(); g.translate(Math.round(P.x), Math.round(P.y) + 1 - bob);
@@ -4086,7 +4123,7 @@ let last = performance.now();
 function frame(now) {
   const dt = Math.min(0.05, Math.max(0, (now - last) / 1000)); last = now;
   if (G.screen === 'game' && run) {
-    if (G.state === 'play' || G.state === 'clearing') update(dt);
+    if (G.state === 'play' || G.state === 'clearing' || G.state === 'dying') update(dt);
     if (G.screen === 'game') { render(); updateHud(); }
   }
   requestAnimationFrame(frame);
@@ -4168,7 +4205,7 @@ function autoplay(seconds, god) {
   for (let i = 0; i < steps; i++) {
     if (G.state === 'upgrade') chooseUpgrade((Math.random() * 3) | 0);
     if (G.state === 'result') { out.died = +run.t.toFixed(1); break; }
-    if (G.state === 'play' || G.state === 'clearing') update(dt);
+    if (G.state === 'play' || G.state === 'clearing' || G.state === 'dying') update(dt);
     const p = pct();
     for (const m of [15, 30, 45, 60, 75, 85]) if (p >= m && out.marks[m] == null) out.marks[m] = +run.t.toFixed(1);
     if (run.bossSpawned && out.boss == null) { out.boss = +run.t.toFixed(1); run.bossPctAt = +p.toFixed(1); }
@@ -4319,7 +4356,7 @@ function exposeDebug() { window.__dbg = {
   // run the game for `seconds` with a fixed stick input [x, y] (tests)
   tick(seconds, input) {
     G.forceInput = input || [0, 0];
-    try { for (let i = 0, n = Math.round(seconds * 30); i < n; i++) { if (G.state === 'upgrade') chooseUpgrade(0); if (G.state === 'play' || G.state === 'clearing') update(1 / 30); } }
+    try { for (let i = 0, n = Math.round(seconds * 30); i < n; i++) { if (G.state === 'upgrade') chooseUpgrade(0); if (G.state === 'play' || G.state === 'clearing' || G.state === 'dying') update(1 / 30); } }
     finally { G.forceInput = null; }
   },
   applyRestore, sealSpring,
