@@ -194,7 +194,7 @@ def character_def(cid: str, folder: pathlib.Path, meta: dict, sprite: pathlib.Pa
                 continue
             a, b = px["tags"][tag]
             d[key] = {"src": strip(px, a, b), "frames": b - a + 1, "durs": [round(v, 3) for v in px["secs"][a:b + 1]]}
-            for opt in ("loop", "dt"):
+            for opt in ("loop", "dt", "windup"):
                 if opt in spec:
                     d[key][opt] = spec[opt]
     for key in ("walk", "attack"):

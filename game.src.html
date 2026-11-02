@@ -1180,10 +1180,13 @@ function makeCharacter(def, imgs) {
     walk = [cut.canvas]; ax = cut.ax; ay = cut.ay;
   }
   const H = clamp(Number(def.height) || CHAR_H, 36, 80);
-  CH.pixel = def.pixelated != null ? !!def.pixelated : ay <= CHAR_H * 1.7;
+  // body: the figure's height in source px when the frames leave room above her (else the feet line)
+  const fig = Number(def.body) > 0 ? Number(def.body) : ay;
+  CH.pixel = def.pixelated != null ? !!def.pixelated : fig <= CHAR_H * 1.7;
   // world px per source px: pixel art keeps whole-number steps so every source pixel stays square
-  CH.s = CH.pixel && ay <= H * 1.5 ? Math.max(1, Math.round(H / ay)) : H / ay;
-  CH.H = (Number(def.body) > 0 ? Number(def.body) : ay) * CH.s; // body: figure height when the canvas has room above her
+  // (a figure drawn at twice the detail gets exactly half a world px per source px)
+  CH.s = CH.pixel && fig <= H * 1.5 ? Math.max(1, Math.round(H / fig)) : H / fig;
+  CH.H = fig * CH.s;
   CH.walk = walk; CH.attack = attack; CH.ax = ax; CH.ay = ay;
   CH.anims = {};
   for (const k of ANIMS) {
@@ -1193,7 +1196,8 @@ function makeCharacter(def, imgs) {
   const loop = def.walk && Array.isArray(def.walk.loop) ? def.walk.loop.filter((i) => i >= 0 && i < walk.length) : [];
   CH.loop = loop.length ? loop : walk.length > 2 ? walk.map((_, i) => i).slice(1) : walk.map((_, i) => i); // frame 0 = standing
   CH.dt = (def.walk && Number(def.walk.dt)) || 0.15;
-  CH.procedural = walk.length < 2;
+  CH.procedural = walk.length < 2; // a single still walks by procedural motion (drawn actions still play)
+  CH.windup = (def.attack && Number(def.attack.windup)) | 0;    // attack frames shown just before the gust leaves
   CH.portrait = def.portrait || walk[0].toDataURL();
   CH.cache = null;
   return CH;
@@ -2929,22 +2933,27 @@ function drawPlayer(g) {
     g.globalAlpha = 1;
   }
   if (P.inv > 0 && P.inv < 0.88 && G.state === 'play' && Math.floor(P.inv * 14) % 2 === 0) return; // blink
-  const A = CH.anims, atkLen = A.attack ? A.attack.durs.reduce((a, v) => a + v, 0) : ATK_F0 + ATK_F1;
+  const A = CH.anims, sum = (l) => l.reduce((a, v) => a + v, 0);
+  // the attack sheet may open with wind-up frames, shown while the next gust is about to leave
+  const wu = A.attack ? Math.min(CH.windup, A.attack.frames.length - 1) : 0;
+  const strike = A.attack ? A.attack.durs.slice(wu) : null, atkLen = A.attack ? sum(strike) : ATK_F0 + ATK_F1;
   const since = R.time - P.fireAt, swing = since >= 0 && since < atkLen;
+  const winding = wu > 0 && !swing && G.state === 'play' && R.fireT > 0 && R.fireT < sum(A.attack.durs.slice(0, wu));
   const white = P.inv > 0.88 && G.state === 'play';
   const flip = CH.faces === 'left' ? P.facing > 0 : P.facing < 0;
   const attacking = swing && !!CH.attack;
   let f = 0, bob = 0, rot = 0, sx = 1, sy = 1, anim = 'walk';
+  // the win once 大墨 falls, a knock-back just after a hit, the fan swing (and its wind-up), walking, standing
+  const hurtFor = A.hurt ? sum(A.hurt.durs) : 0;
+  if (G.state === 'clearing' && A.win) { anim = 'win'; f = frameAt(A.win.durs, R.time - (R.clearAt ?? R.time), false); }
+  else if (A.hurt && R.hurtAt != null && R.time - R.hurtAt < hurtFor) { anim = 'hurt'; f = frameAt(A.hurt.durs, R.time - R.hurtAt, false); }
+  else if (attacking) { anim = 'attack'; f = wu + frameAt(strike, since, false); }
+  else if (winding) { anim = 'attack'; f = frameAt(A.attack.durs.slice(0, wu), sum(A.attack.durs.slice(0, wu)) - R.fireT, false); }
   if (!CH.procedural) {
-    // the win once 大墨 falls, a knock-back just after a hit, the fan swing, walking, then standing
-    const hurtFor = A.hurt ? A.hurt.durs.reduce((a, v) => a + v, 0) : 0;
-    if (G.state === 'clearing' && A.win) { anim = 'win'; f = frameAt(A.win.durs, R.time - (R.clearAt ?? R.time), false); }
-    else if (A.hurt && R.hurtAt != null && R.time - R.hurtAt < hurtFor) { anim = 'hurt'; f = frameAt(A.hurt.durs, R.time - R.hurtAt, false); }
-    else if (attacking) { anim = 'attack'; f = frameAt(A.attack.durs, since, false); }
-    else if (P.moving) f = CH.loop[Math.floor(R.time / CH.dt) % CH.loop.length];
-    else if (A.idle) { anim = 'idle'; f = frameAt(A.idle.durs, R.time, true); }
-    else bob = Math.floor(R.time / 0.4) % 2;
-  } else {
+    if (anim === 'walk' && P.moving) f = CH.loop[Math.floor(R.time / CH.dt) % CH.loop.length];
+    else if (anim === 'walk' && A.idle) { anim = 'idle'; f = frameAt(A.idle.durs, R.time, true); }
+    else if (anim === 'walk') bob = Math.floor(R.time / 0.4) % 2;
+  } else if (anim === 'walk') {
     const t = R.time;
     if (P.moving) { const ph = (t / 0.3) * Math.PI; bob = Math.abs(Math.sin(ph)) * CH.H * 0.04; rot = Math.sin(ph) * 0.05; sy = 1 - 0.025 * Math.abs(Math.cos(ph)); }
     else { bob = 0; sy = 1 + 0.012 * Math.sin(t * 2.6); }
@@ -2956,6 +2965,7 @@ function drawPlayer(g) {
   if (CH.pixel) {
     const img = (white ? A[anim].white : A[anim].frames)[f], s = CH.s;
     g.save(); g.translate(Math.round(P.x), Math.round(P.y) + 1 - bob);
+    g.imageSmoothingEnabled = false;
     if (flip) g.scale(-1, 1);
     g.drawImage(img, -CH.ax * s, -CH.ay * s, img.width * s, img.height * s);
     g.restore();

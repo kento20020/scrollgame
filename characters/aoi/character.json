@@ -6,9 +6,11 @@
   "sprite": "sprite.png",
   "portrait": "portrait.png",
   "pxo": "aoi.pxo",
-  "walk": { "tag": "walk", "loop": [1, 2, 3, 2] },
-  "feet": [18, 58],
-  "body": 54,
+  "walk": { "tag": "walk", "loop": [1, 2, 3, 4] },
+  "attack": { "tag": "attack", "windup": 1 },
+  "feet": [74, 130],
+  "body": 104,
+  "height": 52,
   "faces": "left",
   "pixelated": true
 }
